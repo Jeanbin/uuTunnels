@@ -2,6 +2,7 @@
 
 mod api;
 mod autostart;
+mod browser_tab;
 mod config;
 mod forwarder;
 mod ssh_engine;
@@ -14,11 +15,13 @@ use crate::ssh_engine::SshEngine;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::PathBuf;
+use std::sync::atomic::AtomicU64;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 use tracing::info;
+use uuid::Uuid;
 
 struct CliArgs {
     no_open: bool,
@@ -69,6 +72,23 @@ fn is_already_running(ui_port: u16) -> bool {
     buf.contains("uuTunnels")
 }
 
+fn request_running_instance_open(ui_port: u16) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], ui_port));
+    let Ok(mut s) = TcpStream::connect_timeout(&addr, Duration::from_millis(300)) else {
+        return false;
+    };
+    let _ = s.set_read_timeout(Some(Duration::from_millis(500)));
+    let _ = s.set_write_timeout(Some(Duration::from_millis(400)));
+    if s.write_all(b"POST /api/ui/open HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n\r\n")
+        .is_err()
+    {
+        return false;
+    }
+    let mut buf = String::new();
+    let _ = s.read_to_string(&mut buf);
+    buf.contains("200 OK")
+}
+
 fn main() {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -86,8 +106,8 @@ fn main() {
     let ui_port = cfg.ui_port;
 
     if is_already_running(ui_port) {
-        if !cli.no_open {
-            tray::open_ui_window(ui_port);
+        if !cli.no_open && !request_running_instance_open(ui_port) {
+            browser_tab::focus_or_open_ui(ui_port, || {});
         }
         return;
     }
@@ -108,6 +128,8 @@ fn main() {
             config: Arc::new(RwLock::new(cfg.clone())),
             ssh: ssh.clone(),
             forwarder: forwarder.clone(),
+            ui_boot_id: Uuid::new_v4().to_string(),
+            ui_reload_seq: Arc::new(AtomicU64::new(0)),
         };
         (ssh, forwarder, app_state)
     };
@@ -139,9 +161,10 @@ fn main() {
 
     if !cli.no_open {
         let open_port = ui_port;
+        let open_reload_seq = app_state.ui_reload_seq.clone();
         std::thread::spawn(move || {
             std::thread::sleep(Duration::from_millis(250));
-            tray::open_ui_window(open_port);
+            tray::trigger_open_ui(open_port, open_reload_seq);
         });
     }
 

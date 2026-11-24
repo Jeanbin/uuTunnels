@@ -1,6 +1,6 @@
 [package]
 name = "uuTunnels"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Windows tray & web UI port-forwarding manager multiplexed over a single SSH / SOCKS5 / Direct tunnel base"
 
@@ -21,6 +21,11 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tray-icon = "0.26"
 uuid = { version = "1", features = ["v4"] }
+windows = { version = "0.59", features = [
+    "Win32_Foundation",
+    "Win32_System_Com",
+    "Win32_UI_Accessibility",
+] }
 windows-sys = { version = "0.61", features = [
     "Win32_Foundation",
     "Win32_System_Diagnostics_ToolHelp",

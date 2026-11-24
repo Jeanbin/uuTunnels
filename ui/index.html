@@ -251,8 +251,8 @@
     margin-right: var(--rail-collapsed-w);
   }
   .shell {
-    max-width: 1440px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: none;
     padding: 8px 12px 12px;
   }
 
@@ -305,6 +305,7 @@
     background: var(--bg);
     padding: 1px 6px;
     white-space: pre;
+    font-variant-numeric: tabular-nums;
   }
   .telemetry-item b {
     color: var(--accent);
@@ -496,54 +497,126 @@
     width: 100%;
     overflow-x: auto;
   }
-  table.tui-table {
+  .rules-table {
     width: 100%;
-    border-collapse: collapse;
+    min-width: 890px;
     font-size: 12px;
   }
-  table.tui-table th {
-    text-align: left;
+  .rules-head,
+  .rules-row {
+    display: grid;
+    grid-template-columns:
+      108px
+      70px
+      minmax(88px, 1.1fr)
+      minmax(175px, 1.9fr)
+      minmax(115px, 1.2fr)
+      minmax(170px, 2.45fr)
+      164px;
+    align-items: center;
+  }
+  .rules-head {
     color: var(--text-dim);
-    font-weight: 400;
     font-size: 11px;
-    padding: 3px 6px;
     border-bottom: 1px solid var(--border);
     background: var(--panel);
-    white-space: nowrap;
   }
-  table.tui-table td {
-    padding: 2px 6px;
-    line-height: 1.2;
+  .rules-row {
     border-bottom: 1px dashed #1f252d;
-    vertical-align: middle;
-    white-space: nowrap;
   }
-  table.tui-table tr:last-child td {
+  .rules-row:last-child {
     border-bottom: none;
   }
-  table.tui-table tr:hover td {
+  .rules-row:hover {
     background: #13161b;
   }
-  .td-name {
+  .rules-cell {
+    min-width: 0;
+    padding: 2px 6px;
+    line-height: 1.2;
+  }
+  .rules-head .rules-cell {
+    padding: 3px 6px;
+    white-space: nowrap;
+  }
+  .cell-ctrl {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+  }
+  .cell-proto {
+    white-space: nowrap;
+  }
+  .cell-name {
     color: #ffffff;
     font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-  .td-addr {
+  .cell-addr {
     color: var(--text);
+    overflow: hidden;
   }
-  .td-target {
+  .addr-cell {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+    max-width: 100%;
+  }
+  .addr-text {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 0 1 auto;
+  }
+  .addr-path {
+    color: var(--cyan);
+  }
+  .addr-btns {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    flex-shrink: 0;
+  }
+  .cell-target {
     color: var(--text-dim);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cell-status {
+    overflow: hidden;
+  }
+  .status-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 6px;
+    min-width: 0;
   }
   .td-stats {
     color: var(--text-dim);
     font-size: 11px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
   }
-  .td-status {
-    max-width: 260px;
+  .td-speed {
+    color: var(--cyan);
+    font-size: 11px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .td-speed-idle {
+    color: var(--text-muted);
   }
   .rule-err-line {
     display: block;
-    max-width: 240px;
+    width: 100%;
+    max-width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -551,23 +624,11 @@
     font-size: 11px;
     margin-top: 1px;
   }
-  .td-ops {
+  .cell-ops {
     display: flex;
     align-items: center;
     gap: 4px;
-  }
-  .addr-cell {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-  }
-  .addr-path {
-    color: var(--cyan);
-    max-width: 220px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    display: inline-block;
-    vertical-align: bottom;
+    white-space: nowrap;
   }
 
   /* Far-Right UU Windows Vertical Rail */
@@ -745,6 +806,66 @@
     padding: 8px 4px;
   }
 
+  /* Step-by-Step Guide */
+  .guide-steps {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .guide-step {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: 7px 9px;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .guide-step-head {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding-bottom: 4px;
+    border-bottom: 1px dashed #1f252d;
+  }
+  .guide-step-num {
+    color: var(--accent);
+    border: 1px solid var(--accent-border);
+    background: var(--accent-dim);
+    padding: 0 4px;
+    font-size: 11px;
+    font-weight: 700;
+    white-space: pre;
+  }
+  .guide-step-title {
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 12px;
+  }
+  .guide-step-desc {
+    color: var(--text-dim);
+    font-size: 11.5px;
+    line-height: 1.45;
+  }
+  .guide-step-desc b {
+    color: var(--text);
+    font-weight: 700;
+  }
+  .guide-code {
+    color: var(--cyan);
+    border: 1px solid #1d4f6b;
+    background: var(--cyan-dim);
+    padding: 0 3px;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  .guide-foot {
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+
   /* Modals */
   .modal-backdrop {
     position: fixed;
@@ -844,6 +965,12 @@
     display: block;
   }
 
+  @media (max-width: 1200px) {
+    .guide-steps {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
   @media (max-width: 1024px) {
     .main-pane,
     body.uu-rail-collapsed .main-pane {
@@ -868,6 +995,12 @@
     .toast,
     body.uu-rail-collapsed .toast {
       right: 16px;
+    }
+  }
+
+  @media (max-width: 680px) {
+    .guide-steps {
+      grid-template-columns: 1fr;
     }
   }
 </style>
@@ -898,6 +1031,7 @@
       <span class="toolbar-sep">|</span>
       <button id="btn-autostart" class="tui-check" onclick="toggleAutostart()">[ ] 开机自启</button>
       <button class="tui-btn tui-btn-muted" onclick="openConfigDir()">[ 配置目录 ]</button>
+      <button class="tui-btn tui-btn-muted" onclick="toggleGuideSection()">[ ? 说明 ]</button>
     </div>
   </header>
 
@@ -907,7 +1041,7 @@
       <div class="section-title">
         <span class="section-idx">[1]</span>
         <span>隧道基座</span>
-        <span class="section-hint">(只需在 UU 远程保留 1 条 SSH 端口映射)</span>
+        <span class="section-hint">(每个独立内网只需在 UU 远程保留 1 条 SSH 端口映射)</span>
       </div>
       <div class="section-actions">
         <button class="tui-btn tui-btn-accent" onclick="openBaseModal()">[ + 新增基座 ]</button>
@@ -949,6 +1083,54 @@
       </div>
     </div>
     <div class="section-body" id="machine-list"></div>
+  </section>
+
+  <!-- ? 快速上手指南 (Step-by-Step) -->
+  <section id="guide-section" class="section">
+    <div class="section-head">
+      <div class="section-title">
+        <span class="section-idx">[?]</span>
+        <span>快速上手指南</span>
+        <span class="section-hint">(Step-by-Step · 4 步完成配置)</span>
+      </div>
+      <div class="section-actions">
+        <button class="tui-btn tui-btn-sm tui-btn-muted" onclick="dismissGuideForever()">[ 不再显示 ]</button>
+        <button class="tui-btn tui-btn-sm tui-btn-muted" title="本次关闭，刷新页面后将重新显示" onclick="closeGuideOnce()">[ × 关闭 ]</button>
+      </div>
+    </div>
+    <div class="section-body">
+      <div class="guide-steps">
+        <div class="guide-step">
+          <div class="guide-step-head">
+            <span class="guide-step-num">STEP 01</span>
+            <span class="guide-step-title">准备被控端与 SSH</span>
+          </div>
+          <div class="guide-step-desc">在目标内网的 <b>Windows</b>（官方网易 UU 远程 + 开启 OpenSSH 服务）或 <b>Linux</b>（如 <span class="guide-code">uu-remote-linux</span> + SSH 服务）主机上登录绑定 UU 远程账号，确保 SSH（默认 <span class="guide-code">22</span> 端口）可用。</div>
+        </div>
+        <div class="guide-step">
+          <div class="guide-step-head">
+            <span class="guide-step-num">STEP 02</span>
+            <span class="guide-step-title">UU 建 SSH 基座映射</span>
+          </div>
+          <div class="guide-step-desc">在主控端网易 UU 远程「端口映射」中，为<b>每个独立内网</b>各建 1 条 SSH 映射（如 <span class="guide-code">127.0.0.1:2201</span> -&gt; <span class="guide-code">22</span>；若需连接不同网络，再建第 2 条如 <span class="guide-code">127.0.0.1:2202</span> -&gt; <span class="guide-code">22</span>）。</div>
+        </div>
+        <div class="guide-step">
+          <div class="guide-step-head">
+            <span class="guide-step-num">STEP 03</span>
+            <span class="guide-step-title">绑定基座与映射规则</span>
+          </div>
+          <div class="guide-step-desc">在 <span class="guide-code">[1] 隧道基座</span> 填写凭据并连接；在 <span class="guide-code">[2] 映射规则</span> 选择所属基座并开启 <span class="guide-code">[■ ON ]</span>。<b>同一局域网</b>多台设备（如本机 + 同网段 NAS）共用 <b>1 个基座</b>即可；<b>不同网络</b>的设备需分别新增并绑定各自基座。</div>
+        </div>
+        <div class="guide-step">
+          <div class="guide-step-head">
+            <span class="guide-step-num">STEP 04</span>
+            <span class="guide-step-title">收纳 UU 窗口防误关</span>
+          </div>
+          <div class="guide-step-desc">点击 <span class="guide-code">[ &gt;_ 收纳 UU 窗口 ]</span> 或勾选右侧 <span class="guide-code">[x] 基座连上自动收纳</span>，隐藏 UU 端口映射子窗口，避免误点 <span class="guide-code">×</span> 导致链路断开。</div>
+        </div>
+      </div>
+      <div class="guide-foot">&gt; 说明：同局域网多机共用 1 个基座（经该被控端转发至本机 127.0.0.1 或同网段 IP）；跨网络（如家里 / 公司）请为每个网络各建 1 个基座。关闭本网页后程序仍在托盘运行，可随时点顶部 [ ? 说明 ] 查看。</div>
+    </div>
   </section>
 </div>
 </div><!-- /.main-pane -->
@@ -1162,10 +1344,16 @@ let state = {
   autostart: false,
   auto_hide_uu: false,
   config_path: '',
-  ui_port: 17890
+  ui_port: 17890,
+  ui_boot_id: '',
+  ui_reload_seq: 0
 };
 let onlyEnabled = false;
 let toastTimer = null;
+let knownBootId = null;
+let knownReloadSeq = null;
+let isReloadingPage = false;
+const ruleSpeedCache = {};
 
 function esc(s) {
   return String(s ?? '')
@@ -1204,9 +1392,101 @@ async function api(path, opts) {
   return data;
 }
 
+function handleUiSignal(bootId, reloadSeq) {
+  if (isReloadingPage) return true;
+  if (bootId == null || reloadSeq == null) return false;
+  if (knownBootId === null) {
+    knownBootId = bootId;
+    knownReloadSeq = reloadSeq;
+    return false;
+  }
+  if (bootId !== knownBootId || reloadSeq !== knownReloadSeq) {
+    isReloadingPage = true;
+    window.location.reload();
+    return true;
+  }
+  return false;
+}
+
+async function checkReloadSignal() {
+  if (isReloadingPage) return;
+  try {
+    const res = await fetch('/api/ui/signal', { cache: 'no-store' });
+    if (!res.ok) return;
+    const sig = await res.json();
+    handleUiSignal(sig.boot_id, sig.reload_seq);
+  } catch (_) {}
+}
+
+function updateRuleSpeedCache(rules) {
+  const now = Date.now();
+  const seen = new Set();
+  for (const r of (rules || [])) {
+    seen.add(r.id);
+    const rt = r.runtime || {};
+    if (rt.status !== 'running') {
+      delete ruleSpeedCache[r.id];
+      continue;
+    }
+    const rxBytes = Number(rt.rx_bytes || 0);
+    const txBytes = Number(rt.tx_bytes || 0);
+    const rxBps = Number(rt.rx_bps || 0);
+    const txBps = Number(rt.tx_bps || 0);
+    let prev = ruleSpeedCache[r.id];
+    if (prev && (rxBytes < prev.rxBytes || txBytes < prev.txBytes)) {
+      prev = null;
+    }
+    const elapsedSec = prev ? Math.max(0.5, (now - prev.lastAt) / 1000) : 1;
+    const dRx = prev ? (rxBytes - prev.rxBytes) : 0;
+    const dTx = prev ? (txBytes - prev.txBytes) : 0;
+    if (txBps > 0 || rxBps > 0) {
+      ruleSpeedCache[r.id] = {
+        rxBytes,
+        txBytes,
+        lastAt: now,
+        txRate: txBps,
+        rxRate: rxBps,
+        hasData: true
+      };
+    } else if (prev && (dTx > 0 || dRx > 0)) {
+      ruleSpeedCache[r.id] = {
+        rxBytes,
+        txBytes,
+        lastAt: now,
+        txRate: Math.round(dTx / elapsedSec),
+        rxRate: Math.round(dRx / elapsedSec),
+        hasData: true
+      };
+    } else if (prev) {
+      prev.rxBytes = rxBytes;
+      prev.txBytes = txBytes;
+      prev.lastAt = now;
+    } else {
+      ruleSpeedCache[r.id] = {
+        rxBytes,
+        txBytes,
+        lastAt: now,
+        txRate: 0,
+        rxRate: 0,
+        hasData: false
+      };
+    }
+  }
+  for (const id of Object.keys(ruleSpeedCache)) {
+    if (!seen.has(id)) {
+      delete ruleSpeedCache[id];
+    }
+  }
+}
+
 async function refreshState() {
   try {
-    state = await api('/api/state');
+    const next = await api('/api/state', { cache: 'no-store' });
+    if (handleUiSignal(next.ui_boot_id, next.ui_reload_seq)) {
+      return;
+    }
+    state = next;
+    updateRuleSpeedCache(state.rules);
     render();
   } catch (e) {
     console.error(e);
@@ -1346,21 +1626,27 @@ function render() {
       mRules.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
 
       const rowsHtml = mRules.length === 0
-        ? '<tr><td colspan="7" class="empty-line">&gt; 当前筛选条件下无匹配规则</td></tr>'
+        ? '<div class="empty-line">&gt; 当前筛选条件下无匹配规则</div>'
         : mRules.map(r => {
             const p = String(r.protocol || 'tcp').toLowerCase();
             const lhost = r.local_host || '127.0.0.1';
             const laddr = esc(lhost) + ':' + r.local_port;
             const urlPath = (p === 'http' || p === 'https') ? normalizeUrlPath(r.url_path) : '';
             const fullWebUrl = (p === 'http' || p === 'https') ? buildWebUrl(p, lhost, r.local_port, urlPath) : (lhost + ':' + r.local_port);
-            const laddrHtml = '<span>' + laddr + (urlPath ? '<span class="addr-path" title="' + esc(fullWebUrl) + '">' + esc(urlPath) + '</span>' : '') + '</span>';
+            const laddrHtml = '<span class="addr-text" title="' + esc(fullWebUrl) + '">' + laddr + (urlPath ? '<span class="addr-path">' + esc(urlPath) + '</span>' : '') + '</span>';
             const taddr = esc(r.target_host) + ':' + r.target_port;
             const rt = r.runtime || {};
-            const speedParts = [];
-            if (rt.tx_bps > 0) speedParts.push('↑' + fmtBytes(rt.tx_bps) + '/s');
-            if (rt.rx_bps > 0) speedParts.push('↓' + fmtBytes(rt.rx_bps) + '/s');
-            const statsText = '连接 ' + (rt.active_conns || 0) + ' · ' + fmtBytes((rt.rx_bytes || 0) + (rt.tx_bytes || 0)) +
-              (speedParts.length ? ' · ' + speedParts.join(' ') : '');
+            const cachedSpeed = ruleSpeedCache[r.id];
+            const baseStatsText = '连接 ' + (rt.active_conns || 0) + ' · ' + fmtBytes((rt.rx_bytes || 0) + (rt.tx_bytes || 0));
+            let speedHtml = '<span class="td-speed td-speed-idle">--</span>';
+            if (rt.status === 'running' && cachedSpeed && cachedSpeed.hasData) {
+              const speedParts = [];
+              if (cachedSpeed.txRate > 0) speedParts.push('↑' + fmtBytes(cachedSpeed.txRate) + '/s');
+              if (cachedSpeed.rxRate > 0) speedParts.push('↓' + fmtBytes(cachedSpeed.rxRate) + '/s');
+              if (speedParts.length) {
+                speedHtml = '<span class="td-speed">' + esc(speedParts.join(' ')) + '</span>';
+              }
+            }
 
             let addrBtns = '';
             if ((p === 'http' || p === 'https') && rt.status === 'running') {
@@ -1379,26 +1665,26 @@ function render() {
               ? '<div class="rule-err-line" title="' + esc(rt.last_error) + '">[!] ' + esc(rt.last_error) + '</div>'
               : '';
 
-            return '<tr>' +
-              '<td>' +
+            return '<div class="rules-row" role="row">' +
+              '<div class="rules-cell cell-ctrl">' +
                 '<button class="tui-switch ' + (r.enabled ? 'on' : 'off') + '" onclick="toggleRule(\'' + esc(r.id) + '\',' + (!r.enabled) + ')">' +
                   (r.enabled ? '[■ ON ]' : '[  OFF]') +
-                '</button> ' +
+                '</button>' +
                 '<button class="tui-pin ' + (r.pinned ? 'on' : 'off') + '" title="置顶到托盘菜单" onclick="pinRule(\'' + esc(r.id) + '\',' + (!r.pinned) + ')">' +
                   (r.pinned ? '[★]' : '[·]') +
                 '</button>' +
-              '</td>' +
-              '<td>' + protoTag(p) + '</td>' +
-              '<td class="td-name">' + esc(r.name) + '</td>' +
-              '<td class="td-addr"><span class="addr-cell">' + laddrHtml + addrBtns + '</span></td>' +
-              '<td class="td-target">-&gt; ' + taddr + '</td>' +
-              '<td class="td-status">' + ruleStatusTag(r) + ' <span class="td-stats">' + esc(statsText) + '</span>' + errTip + '</td>' +
-              '<td><div class="td-ops">' +
+              '</div>' +
+              '<div class="rules-cell cell-proto">' + protoTag(p) + '</div>' +
+              '<div class="rules-cell cell-name" title="' + esc(r.name) + '">' + esc(r.name) + '</div>' +
+              '<div class="rules-cell cell-addr"><div class="addr-cell">' + laddrHtml + '<span class="addr-btns">' + addrBtns + '</span></div></div>' +
+              '<div class="rules-cell cell-target" title="-&gt; ' + taddr + '">-&gt; ' + taddr + '</div>' +
+              '<div class="rules-cell cell-status"><div class="status-line">' + ruleStatusTag(r) + '<span class="td-stats">' + esc(baseStatsText) + '</span>' + speedHtml + '</div>' + errTip + '</div>' +
+              '<div class="rules-cell cell-ops">' +
                 '<button class="tui-btn tui-btn-sm tui-btn-muted" onclick="probeRule(\'' + esc(r.id) + '\')">[测通]</button>' +
                 '<button class="tui-btn tui-btn-sm tui-btn-muted" onclick="openRuleModal(\'' + esc(m.id) + '\',\'' + esc(r.id) + '\')">[编辑]</button>' +
                 '<button class="tui-btn tui-btn-sm tui-btn-danger" onclick="deleteRule(\'' + esc(r.id) + '\')">[删除]</button>' +
-              '</div></td>' +
-            '</tr>';
+              '</div>' +
+            '</div>';
           }).join('');
 
       const metaText = (m.note && m.note.includes(m.default_target_host))
@@ -1422,18 +1708,18 @@ function render() {
           '</div>' +
         '</div>' +
         '<div class="table-wrap">' +
-          '<table class="tui-table">' +
-            '<thead><tr>' +
-              '<th style="width:118px">开关 / 置顶</th>' +
-              '<th style="width:76px">协议</th>' +
-              '<th>服务名称</th>' +
-              '<th>本地访问地址</th>' +
-              '<th>远端目标</th>' +
-              '<th>状态 / 实时速率</th>' +
-              '<th style="width:175px">操作</th>' +
-            '</tr></thead>' +
-            '<tbody>' + rowsHtml + '</tbody>' +
-          '</table>' +
+          '<div class="rules-table" role="table">' +
+            '<div class="rules-head" role="row">' +
+              '<div class="rules-cell" role="columnheader">开关 / 置顶</div>' +
+              '<div class="rules-cell" role="columnheader">协议</div>' +
+              '<div class="rules-cell" role="columnheader">服务名称</div>' +
+              '<div class="rules-cell" role="columnheader">本地访问地址</div>' +
+              '<div class="rules-cell" role="columnheader">远端目标</div>' +
+              '<div class="rules-cell" role="columnheader">状态 / 实时速率</div>' +
+              '<div class="rules-cell" role="columnheader">操作</div>' +
+            '</div>' +
+            '<div class="rules-body">' + rowsHtml + '</div>' +
+          '</div>' +
         '</div>' +
       '</div>';
     }).join('');
@@ -1848,6 +2134,7 @@ async function saveRule() {
 }
 
 const UU_RAIL_STORAGE_KEY = 'uutunnels_uu_rail_collapsed';
+const GUIDE_DISMISSED_KEY = 'uutunnels_guide_dismissed';
 
 function applyUuRailState() {
   let collapsed = false;
@@ -1865,9 +2152,57 @@ function toggleUuRail() {
   } catch (_) {}
 }
 
+function applyGuideState() {
+  const el = document.getElementById('guide-section');
+  if (!el) return;
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(GUIDE_DISMISSED_KEY) === '1';
+  } catch (_) {}
+  el.style.display = dismissed ? 'none' : '';
+}
+
+function closeGuideOnce() {
+  const el = document.getElementById('guide-section');
+  if (el) el.style.display = 'none';
+}
+
+function dismissGuideForever() {
+  try {
+    localStorage.setItem(GUIDE_DISMISSED_KEY, '1');
+  } catch (_) {}
+  const el = document.getElementById('guide-section');
+  if (el) el.style.display = 'none';
+  showToast('已设为不再显示（可点击顶部 [ ? 说明 ] 重新查看）');
+}
+
+function toggleGuideSection() {
+  const el = document.getElementById('guide-section');
+  if (!el) return;
+  const hidden = el.style.display === 'none';
+  el.style.display = hidden ? '' : 'none';
+  if (hidden) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+if (window.location.port && window.location.port !== '17890') {
+  document.title = 'uuTunnels :: 端口映射控制台 (:' + window.location.port + ')';
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) {
+    checkReloadSignal();
+  }
+});
+window.addEventListener('focus', () => {
+  checkReloadSignal();
+});
+
 // Clear any accidental browser autofill before initial render
 document.getElementById('filter-query').value = '';
 applyUuRailState();
+applyGuideState();
 refreshState();
 setInterval(refreshState, 2000);
 </script>

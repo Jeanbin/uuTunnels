@@ -1,19 +1,20 @@
 use crate::api::AppState;
+use crate::browser_tab;
 use crate::config;
 use crate::ssh_engine::BaseStatus;
 use crate::uu_window;
 use std::ffi::OsStr;
 use std::os::windows::ffi::OsStrExt;
-use std::sync::mpsc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{mpsc, Arc, Mutex};
+use std::time::{Duration, Instant};
 use tokio_util::sync::CancellationToken;
 use tray_icon::menu::{CheckMenuItem, Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem, Submenu};
 use tray_icon::{Icon, MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use windows_sys::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
-use windows_sys::Win32::UI::Shell::ShellExecuteW;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, DispatchMessageW, GetMessageW, KillTimer,
-    PostQuitMessage, RegisterClassW, SetTimer, TranslateMessage, MSG, SW_SHOWNORMAL, WM_TIMER,
-    WNDCLASSW,
+    PostQuitMessage, RegisterClassW, SetTimer, TranslateMessage, MSG, WM_TIMER, WNDCLASSW,
 };
 
 const ID_OPEN: &str = "sys:open";
@@ -57,21 +58,44 @@ fn to_wide(s: &str) -> Vec<u16> {
     OsStr::new(s).encode_wide().chain(std::iter::once(0)).collect()
 }
 
-/// Opens the management UI directly in the system default browser.
-pub fn open_ui_window(ui_port: u16) {
-    let url = format!("http://127.0.0.1:{ui_port}/");
-    let op = to_wide("open");
-    let target = to_wide(&url);
-    unsafe {
-        ShellExecuteW(
-            std::ptr::null_mut(),
-            op.as_ptr(),
-            target.as_ptr(),
-            std::ptr::null(),
-            std::ptr::null(),
-            SW_SHOWNORMAL,
-        );
+static OPEN_GATE: Mutex<Option<Instant>> = Mutex::new(None);
+static OPEN_IN_PROGRESS: AtomicBool = AtomicBool::new(false);
+
+struct OpenInProgressGuard;
+
+impl Drop for OpenInProgressGuard {
+    fn drop(&mut self) {
+        OPEN_IN_PROGRESS.store(false, Ordering::SeqCst);
     }
+}
+
+/// Focuses an existing browser tab showing the management UI (and bumps `reload_seq`
+/// so the page refreshes), or opens a new browser tab if none is found.
+/// Debounced and executed on a dedicated worker thread so COM UIA never blocks the tray loop.
+pub fn trigger_open_ui(ui_port: u16, reload_seq: Arc<AtomicU64>) {
+    {
+        let mut gate = OPEN_GATE.lock().unwrap();
+        let now = Instant::now();
+        if let Some(prev) = *gate {
+            if now.duration_since(prev) < Duration::from_millis(500) {
+                return;
+            }
+        }
+        if OPEN_IN_PROGRESS
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .is_err()
+        {
+            return;
+        }
+        *gate = Some(now);
+    }
+
+    std::thread::spawn(move || {
+        let _guard = OpenInProgressGuard;
+        browser_tab::focus_or_open_ui(ui_port, || {
+            reload_seq.fetch_add(1, Ordering::SeqCst);
+        });
+    });
 }
 
 fn generate_tray_icon(health: TrayHealth) -> Icon {
@@ -405,7 +429,7 @@ pub fn run_tray_loop(
                         button: MouseButton::Left,
                         ..
                     } => {
-                        open_ui_window(ui_port);
+                        trigger_open_ui(ui_port, app_state.ui_reload_seq.clone());
                     }
                     _ => {}
                 }
@@ -414,7 +438,7 @@ pub fn run_tray_loop(
             while let Ok(ev) = menu_rx.try_recv() {
                 let id_str = ev.id.0.as_str();
                 if id_str == ID_OPEN {
-                    open_ui_window(ui_port);
+                    trigger_open_ui(ui_port, app_state.ui_reload_seq.clone());
                 } else if id_str == ID_HIDE_UU {
                     let _ = uu_window::hide_portmap_windows();
                 } else if id_str == ID_SHOW_UU {

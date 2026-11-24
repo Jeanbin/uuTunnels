@@ -10,6 +10,7 @@ use axum::routing::{get, post, put};
 use axum::Router;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use uuid::Uuid;
@@ -22,6 +23,8 @@ pub struct AppState {
     pub config: Arc<RwLock<AppConfig>>,
     pub ssh: Arc<SshEngine>,
     pub forwarder: Arc<ForwarderManager>,
+    pub ui_boot_id: String,
+    pub ui_reload_seq: Arc<AtomicU64>,
 }
 
 #[derive(Serialize)]
@@ -66,6 +69,8 @@ struct StateResponse {
     auto_hide_uu: bool,
     config_path: String,
     ui_port: u16,
+    ui_boot_id: String,
+    ui_reload_seq: u64,
 }
 
 pub fn build_router(state: AppState) -> Router {
@@ -73,6 +78,8 @@ pub fn build_router(state: AppState) -> Router {
         .route("/", get(index_handler))
         .route("/api/ping", get(|| async { "uuTunnels" }))
         .route("/api/state", get(get_state))
+        .route("/api/ui/signal", get(get_ui_signal))
+        .route("/api/ui/open", post(open_ui_handler))
         .route("/api/bases", post(create_base))
         .route("/api/bases/{id}", put(update_base).delete(delete_base))
         .route("/api/bases/{id}/reconnect", post(reconnect_base))
@@ -199,11 +206,26 @@ async fn build_state_payload(state: &AppState) -> StateResponse {
         auto_hide_uu: cfg.auto_hide_uu,
         config_path: state.config_path.display().to_string(),
         ui_port: cfg.ui_port,
+        ui_boot_id: state.ui_boot_id.clone(),
+        ui_reload_seq: state.ui_reload_seq.load(Ordering::SeqCst),
     }
 }
 
 async fn get_state(State(state): State<AppState>) -> impl IntoResponse {
     Json(build_state_payload(&state).await)
+}
+
+async fn get_ui_signal(State(state): State<AppState>) -> impl IntoResponse {
+    Json(serde_json::json!({
+        "boot_id": state.ui_boot_id,
+        "reload_seq": state.ui_reload_seq.load(Ordering::SeqCst),
+    }))
+}
+
+async fn open_ui_handler(State(state): State<AppState>) -> impl IntoResponse {
+    let ui_port = state.config.read().await.ui_port;
+    crate::tray::trigger_open_ui(ui_port, state.ui_reload_seq.clone());
+    Json(serde_json::json!({ "ok": true }))
 }
 
 #[derive(Deserialize)]
@@ -851,6 +873,8 @@ mod tests {
             config: Arc::new(RwLock::new(cfg)),
             ssh,
             forwarder: fwd,
+            ui_boot_id: "boot-test-1".to_string(),
+            ui_reload_seq: Arc::new(AtomicU64::new(0)),
         };
         let app = build_router(state);
 
@@ -913,6 +937,8 @@ mod tests {
             config: Arc::new(RwLock::new(cfg)),
             ssh,
             forwarder: fwd,
+            ui_boot_id: "boot-test-1".to_string(),
+            ui_reload_seq: Arc::new(AtomicU64::new(0)),
         };
         let app = build_router(state);
 
@@ -980,6 +1006,71 @@ mod tests {
         let saved3 = config::load_or_create(&tmp).unwrap();
         let extra = saved3.rules.iter().find(|r| r.name == "Extra SSH").unwrap();
         assert_eq!(extra.url_path, "");
+
+        root.cancel();
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[tokio::test]
+    async fn api_ui_signal_tracks_reload_seq() {
+        let tmp = std::env::temp_dir().join(format!("uutunnels_test_{}.json", Uuid::new_v4()));
+        let cfg = AppConfig::preset();
+        config::save(&tmp, &cfg).unwrap();
+
+        let root = CancellationToken::new();
+        let ssh = Arc::new(SshEngine::new(root.clone()));
+        let fwd = Arc::new(ForwarderManager::new(ssh.clone(), root.clone()));
+        let reload_seq = Arc::new(AtomicU64::new(0));
+        let state = AppState {
+            config_path: tmp.clone(),
+            config: Arc::new(RwLock::new(cfg)),
+            ssh,
+            forwarder: fwd,
+            ui_boot_id: "boot-xyz".to_string(),
+            ui_reload_seq: reload_seq.clone(),
+        };
+        let app = build_router(state);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let port = listener.local_addr().unwrap().port();
+        tokio::spawn(async move {
+            axum::serve(listener, app).await.unwrap();
+        });
+
+        let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        s.write_all(b"GET /api/ui/signal HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+            .await
+            .unwrap();
+        let mut buf = String::new();
+        s.read_to_string(&mut buf).await.unwrap();
+        assert!(buf.contains("200 OK"));
+        assert!(buf.contains("\"boot_id\":\"boot-xyz\""));
+        assert!(buf.contains("\"reload_seq\":0"));
+
+        reload_seq.fetch_add(1, Ordering::SeqCst);
+
+        let mut s2 = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        s2.write_all(b"GET /api/ui/signal HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+            .await
+            .unwrap();
+        let mut buf2 = String::new();
+        s2.read_to_string(&mut buf2).await.unwrap();
+        assert!(buf2.contains("\"reload_seq\":1"));
+
+        let mut s3 = tokio::net::TcpStream::connect(("127.0.0.1", port))
+            .await
+            .unwrap();
+        s3.write_all(b"GET /api/state HTTP/1.0\r\nHost: 127.0.0.1\r\n\r\n")
+            .await
+            .unwrap();
+        let mut buf3 = String::new();
+        s3.read_to_string(&mut buf3).await.unwrap();
+        assert!(buf3.contains("\"ui_boot_id\":\"boot-xyz\""));
+        assert!(buf3.contains("\"ui_reload_seq\":1"));
 
         root.cancel();
         let _ = std::fs::remove_file(&tmp);
