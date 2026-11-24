@@ -1,0 +1,14 @@
+# Rust build outputs & release packages
+/target/
+/dist/
+*.pdb
+*.zip
+
+# Exclude all dot-prefixed (hidden) directories (e.g. .agents/, .wendesi/, .vscode/, .idea/)
+.*/
+
+# OS & temporary files
+.DS_Store
+Thumbs.db
+*.swp
+*.tmp

@@ -1,0 +1,36 @@
+[package]
+name = "uuTunnels"
+version = "0.1.0"
+edition = "2021"
+description = "Windows tray & web UI port-forwarding manager multiplexed over a single SSH / SOCKS5 / Direct tunnel base"
+
+[[bin]]
+name = "uuTunnels"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+axum = "0.8"
+dirs = "6"
+russh = { version = "0.54", default-features = false, features = ["flate2", "ring", "rsa"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+tokio-util = "0.7"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tray-icon = "0.26"
+uuid = { version = "1", features = ["v4"] }
+windows-sys = { version = "0.61", features = [
+    "Win32_Foundation",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_Registry",
+    "Win32_System_Threading",
+    "Win32_UI_Shell",
+    "Win32_UI_WindowsAndMessaging",
+] }
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

@@ -1,0 +1,1875 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>uuTunnels :: 端口映射控制台</title>
+<style>
+  :root {
+    --bg: #0c0c0c;
+    --panel: #101215;
+    --panel-alt: #15181c;
+    --panel-hover: #191d22;
+    --border: #2a313a;
+    --border-bright: #3e4957;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-muted: #5b6572;
+    --accent: #10b981;
+    --accent-dim: #0b261e;
+    --accent-border: #1e6b52;
+    --cyan: #38bdf8;
+    --cyan-dim: #0c2230;
+    --warn: #f59e0b;
+    --warn-dim: #2a1f0a;
+    --danger: #f87171;
+    --danger-dim: #2b1214;
+    --danger-border: #7f292d;
+    --rail-w: 272px;
+    --rail-collapsed-w: 34px;
+    --font: "Cascadia Mono", "Cascadia Code", "Ubuntu Mono", "DejaVu Sans Mono", "Microsoft YaHei UI", monospace;
+  }
+
+  * {
+    box-sizing: border-box;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 12.5px;
+    line-height: 1.3;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  button, input, select {
+    font-family: var(--font);
+    font-size: 12px;
+    color: var(--text);
+  }
+
+  /* TUI Character-constructed Buttons & Controls */
+  .tui-btn {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    padding: 2px 6px;
+    cursor: pointer;
+    white-space: pre;
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.2;
+    transition: background-color 0.08s, color 0.08s, border-color 0.08s;
+  }
+  .tui-btn:hover {
+    background: var(--panel-hover);
+    border-color: var(--border-bright);
+    color: #ffffff;
+  }
+  .tui-btn:active {
+    background: var(--border);
+  }
+  .tui-btn:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .tui-btn-primary {
+    background: var(--accent);
+    color: #0c0c0c;
+    font-weight: 700;
+    border-color: var(--accent);
+  }
+  .tui-btn-primary:hover {
+    background: #34d399;
+    border-color: #34d399;
+    color: #0c0c0c;
+  }
+
+  .tui-btn-accent {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+  }
+  .tui-btn-accent:hover {
+    background: #12382c;
+    border-color: var(--accent);
+    color: #6ee7b7;
+  }
+
+  .tui-btn-cyan {
+    color: var(--cyan);
+    border-color: #1d4f6b;
+    background: var(--cyan-dim);
+  }
+  .tui-btn-cyan:hover {
+    background: #123144;
+    border-color: var(--cyan);
+    color: #7dd3fc;
+  }
+
+  .tui-btn-danger {
+    color: var(--danger);
+    border-color: var(--danger-border);
+    background: var(--danger-dim);
+  }
+  .tui-btn-danger:hover {
+    background: #481a1e;
+    border-color: var(--danger);
+    color: #fca5a5;
+  }
+
+  .tui-btn-muted {
+    color: var(--text-dim);
+    border-color: var(--border);
+    background: var(--panel);
+  }
+  .tui-btn-muted:hover {
+    color: var(--text);
+    border-color: var(--border-bright);
+    background: var(--panel-alt);
+  }
+
+  .tui-btn-sm {
+    padding: 1px 4px;
+    font-size: 11.5px;
+    line-height: 1.15;
+  }
+
+  /* Switch: [■ ON ] / [  OFF] */
+  .tui-switch {
+    background: transparent;
+    border: 1px solid var(--border);
+    padding: 1px 4px;
+    cursor: pointer;
+    white-space: pre;
+    font-size: 11.5px;
+    font-weight: 700;
+    line-height: 1.15;
+  }
+  .tui-switch.on {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+  }
+  .tui-switch.on:hover {
+    background: #12382c;
+    border-color: var(--accent);
+  }
+  .tui-switch.off {
+    color: var(--text-dim);
+    border-color: var(--border);
+    background: var(--panel);
+  }
+  .tui-switch.off:hover {
+    color: var(--text);
+    border-color: var(--border-bright);
+  }
+
+  /* Pin: [★] / [·] */
+  .tui-pin {
+    background: transparent;
+    border: 1px solid transparent;
+    padding: 1px 2px;
+    cursor: pointer;
+    white-space: pre;
+    line-height: 1.15;
+  }
+  .tui-pin.on {
+    color: var(--warn);
+  }
+  .tui-pin.off {
+    color: var(--text-muted);
+  }
+  .tui-pin:hover {
+    border-color: var(--border-bright);
+    color: var(--warn);
+  }
+
+  /* Checkbox: [x] / [ ] */
+  .tui-check {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    padding: 2px 6px;
+    cursor: pointer;
+    white-space: pre;
+    color: var(--text-dim);
+    display: inline-flex;
+    align-items: center;
+    line-height: 1.2;
+  }
+  .tui-check.on {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+  }
+  .tui-check:hover {
+    border-color: var(--border-bright);
+    color: var(--text);
+  }
+
+  /* Protocol & Status Tags */
+  .tui-proto {
+    display: inline-block;
+    padding: 0 4px;
+    white-space: pre;
+    font-size: 11px;
+    line-height: 1.3;
+    font-weight: 700;
+    border: 1px solid var(--border);
+    background: var(--panel-alt);
+    color: var(--text);
+  }
+  .tui-proto-http  { color: var(--cyan); border-color: #1d4f6b; background: var(--cyan-dim); }
+  .tui-proto-https { color: var(--accent); border-color: var(--accent-border); background: var(--accent-dim); }
+  .tui-proto-ssh   { color: var(--warn); border-color: #6b4c14; background: var(--warn-dim); }
+  .tui-proto-tcp   { color: #c084fc; border-color: #5b3182; background: #1e122b; }
+
+  .tui-status {
+    display: inline-block;
+    white-space: pre;
+    font-size: 11.5px;
+    padding: 0 3px;
+  }
+  .st-ok    { color: var(--accent); }
+  .st-wait  { color: var(--warn); }
+  .st-off   { color: var(--text-dim); }
+  .st-err   { color: var(--danger); }
+  .st-info  { color: var(--cyan); }
+
+  /* Layout Container */
+  .main-pane {
+    margin-right: var(--rail-w);
+    transition: margin-right 0.12s ease;
+  }
+  body.uu-rail-collapsed .main-pane {
+    margin-right: var(--rail-collapsed-w);
+  }
+  .shell {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 8px 12px 12px;
+  }
+
+  /* Terminal Header Box */
+  .term-header {
+    border: 1px solid var(--border-bright);
+    background: var(--panel);
+    margin-bottom: 8px;
+  }
+  .term-titlebar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 10px;
+    border-bottom: 1px dashed var(--border);
+    background: var(--panel-alt);
+  }
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .brand-logo {
+    background: var(--accent);
+    color: #0c0c0c;
+    font-weight: 700;
+    padding: 1px 6px;
+    letter-spacing: 0.5px;
+  }
+  .brand-title {
+    font-weight: 700;
+    font-size: 13.5px;
+    color: #ffffff;
+  }
+  .brand-sub {
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .telemetry {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    font-size: 11.5px;
+    color: var(--text-dim);
+  }
+  .telemetry-item {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: 1px 6px;
+    white-space: pre;
+  }
+  .telemetry-item b {
+    color: var(--accent);
+    font-weight: 700;
+  }
+
+  .term-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+  }
+  .toolbar-sep {
+    color: var(--text-muted);
+    user-select: none;
+  }
+
+  /* Section Frame */
+  .section {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    margin-bottom: 8px;
+  }
+  .section:last-child {
+    margin-bottom: 0;
+  }
+  .section-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-alt);
+  }
+  .section-title {
+    font-weight: 700;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-idx {
+    color: var(--accent);
+  }
+  .section-hint {
+    color: var(--text-dim);
+    font-weight: 400;
+    font-size: 11.5px;
+  }
+  .section-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+  }
+  .section-body {
+    padding: 6px 8px;
+  }
+
+  /* Search Prompt */
+  .grep-box {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid var(--border-bright);
+    background: var(--bg);
+    padding: 1px 6px;
+    gap: 6px;
+  }
+  .grep-box:focus-within {
+    border-color: var(--accent);
+  }
+  .grep-prompt {
+    color: var(--accent);
+    font-weight: 700;
+    user-select: none;
+  }
+  .grep-input {
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    width: 210px;
+    font-size: 12px;
+  }
+  .grep-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  /* Base Cards */
+  .base-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .base-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .base-info {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+  .base-prompt {
+    color: var(--accent);
+    font-weight: 700;
+  }
+  .base-name {
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .base-meta {
+    color: var(--text-dim);
+  }
+  .base-err {
+    color: var(--danger);
+    font-size: 11.5px;
+    width: 100%;
+    padding-left: 20px;
+  }
+  .base-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* Machine Cards & Rules Table */
+  .machine-card {
+    border: 1px solid var(--border-bright);
+    background: var(--bg);
+    margin-bottom: 8px;
+  }
+  .machine-card:last-child {
+    margin-bottom: 0;
+  }
+  .machine-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding: 4px 8px;
+    background: var(--panel-alt);
+    border-bottom: 1px dashed var(--border);
+  }
+  .machine-title {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 7px;
+  }
+  .machine-badge {
+    color: var(--cyan);
+    font-weight: 700;
+  }
+  .machine-name {
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .machine-meta {
+    color: var(--text-dim);
+  }
+  .machine-base-tag {
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: 0 5px;
+    font-size: 11px;
+  }
+  .machine-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .table-wrap {
+    width: 100%;
+    overflow-x: auto;
+  }
+  table.tui-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  table.tui-table th {
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 400;
+    font-size: 11px;
+    padding: 3px 6px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel);
+    white-space: nowrap;
+  }
+  table.tui-table td {
+    padding: 2px 6px;
+    line-height: 1.2;
+    border-bottom: 1px dashed #1f252d;
+    vertical-align: middle;
+    white-space: nowrap;
+  }
+  table.tui-table tr:last-child td {
+    border-bottom: none;
+  }
+  table.tui-table tr:hover td {
+    background: #13161b;
+  }
+  .td-name {
+    color: #ffffff;
+    font-weight: 600;
+  }
+  .td-addr {
+    color: var(--text);
+  }
+  .td-target {
+    color: var(--text-dim);
+  }
+  .td-stats {
+    color: var(--text-dim);
+    font-size: 11px;
+  }
+  .td-status {
+    max-width: 260px;
+  }
+  .rule-err-line {
+    display: block;
+    max-width: 240px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--danger);
+    font-size: 11px;
+    margin-top: 1px;
+  }
+  .td-ops {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .addr-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .addr-path {
+    color: var(--cyan);
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: inline-block;
+    vertical-align: bottom;
+  }
+
+  /* Far-Right UU Windows Vertical Rail */
+  .uu-rail {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: var(--rail-w);
+    border-left: 1px solid var(--border-bright);
+    background: var(--panel);
+    display: flex;
+    flex-direction: column;
+    z-index: 200;
+    transition: width 0.12s ease;
+  }
+  body.uu-rail-collapsed .uu-rail {
+    width: var(--rail-collapsed-w);
+  }
+  .uu-rail-expanded {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+  }
+  body.uu-rail-collapsed .uu-rail-expanded {
+    display: none;
+  }
+  .uu-rail-tab {
+    display: none;
+  }
+  body.uu-rail-collapsed .uu-rail-tab {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    padding: 8px 0;
+    gap: 10px;
+    background: var(--panel-alt);
+    border: none;
+    color: var(--text);
+    cursor: pointer;
+  }
+  body.uu-rail-collapsed .uu-rail-tab:hover {
+    background: var(--panel-hover);
+  }
+  .uu-rail-vert-title {
+    writing-mode: vertical-rl;
+    letter-spacing: 2px;
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .uu-rail-head {
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--border);
+    background: var(--panel-alt);
+  }
+  .uu-rail-head-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .uu-rail-hint {
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.3;
+    margin-top: 3px;
+  }
+  .uu-count-badge {
+    border: 1px solid var(--accent-border);
+    background: var(--accent-dim);
+    color: var(--accent);
+    padding: 0 5px;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .uu-rail-actions {
+    padding: 6px 8px;
+    border-bottom: 1px dashed var(--border);
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+  .uu-rail-btn-full {
+    width: 100%;
+    justify-content: center;
+  }
+  #btn-auto-hide-uu.uu-rail-btn-full {
+    justify-content: flex-start;
+  }
+  .uu-rail-btn-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+  .uu-rail-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 6px 8px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-bright) var(--bg);
+  }
+  .uu-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .uu-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 6px 7px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .uu-card-top {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+  }
+  .uu-title {
+    font-weight: 700;
+    color: #ffffff;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .uu-card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+  }
+  .uu-card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    padding-top: 3px;
+    border-top: 1px dashed #1f252d;
+  }
+  .uu-meta {
+    color: var(--text-dim);
+    font-size: 11px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .uu-tag {
+    border: 1px solid var(--border);
+    padding: 0 4px;
+    font-size: 11px;
+    white-space: pre;
+  }
+  .uu-tag-portmap {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+  }
+  .uu-tag-main {
+    color: var(--text-dim);
+    border-color: var(--border);
+    background: var(--panel-alt);
+  }
+
+  .empty-line {
+    color: var(--text-muted);
+    padding: 8px 4px;
+  }
+
+  /* Modals */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.78);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+  }
+  .modal-backdrop.open {
+    display: flex;
+  }
+  .modal-box {
+    width: 100%;
+    max-width: 520px;
+    border: 1px solid var(--accent-border);
+    background: var(--panel);
+  }
+  .modal-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: var(--panel-alt);
+    border-bottom: 1px solid var(--border);
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .modal-body {
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .form-grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .form-label {
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .form-input, .form-select {
+    background: var(--bg);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 5px 8px;
+    outline: none;
+    width: 100%;
+  }
+  .form-input:focus, .form-select:focus {
+    border-color: var(--accent);
+  }
+  .form-hint {
+    color: var(--text-muted);
+    font-size: 11px;
+  }
+  .modal-foot {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--border);
+    background: var(--panel-alt);
+  }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    right: calc(var(--rail-w) + 12px);
+    bottom: 12px;
+    border: 1px solid var(--accent);
+    background: #0e1e18;
+    color: var(--accent);
+    padding: 7px 12px;
+    font-size: 12px;
+    display: none;
+    z-index: 2000;
+  }
+  body.uu-rail-collapsed .toast {
+    right: calc(var(--rail-collapsed-w) + 12px);
+  }
+  .toast.err {
+    border-color: var(--danger);
+    background: var(--danger-dim);
+    color: var(--danger);
+  }
+  .toast.show {
+    display: block;
+  }
+
+  @media (max-width: 1024px) {
+    .main-pane,
+    body.uu-rail-collapsed .main-pane {
+      margin-right: 0;
+    }
+    .uu-rail,
+    body.uu-rail-collapsed .uu-rail {
+      position: static;
+      width: auto;
+      height: auto;
+      margin: 0 12px 12px;
+      border: 1px solid var(--border);
+    }
+    body.uu-rail-collapsed .uu-rail-expanded {
+      display: flex;
+    }
+    .uu-rail-tab,
+    body.uu-rail-collapsed .uu-rail-tab,
+    #btn-toggle-uu-rail {
+      display: none;
+    }
+    .toast,
+    body.uu-rail-collapsed .toast {
+      right: 16px;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="main-pane">
+<div class="shell">
+  <!-- Header / Console Banner -->
+  <header class="term-header">
+    <div class="term-titlebar">
+      <div class="brand">
+        <span class="brand-logo">UU://TUI</span>
+        <span class="brand-title">uuTunnels 端口映射控制台</span>
+        <span class="brand-sub">// 基于 SSH 基座的安全端口映射 · 独立开关 · 后台常驻</span>
+      </div>
+      <div class="telemetry">
+        <span class="telemetry-item">运行中: <b id="stat-running">0 / 0</b> <span id="stat-total">(共 0)</span></span>
+        <span class="telemetry-item">活跃连接: <b id="stat-conns">0</b></span>
+        <span class="telemetry-item">总流量: <b id="stat-traffic">0 B</b></span>
+      </div>
+    </div>
+    <div class="term-toolbar">
+      <button class="tui-btn tui-btn-primary" onclick="hidePortmapWindows()">[ &gt;_ 收纳 UU 窗口 ]</button>
+      <button class="tui-btn tui-btn-muted" onclick="showAllUuWindows()">[ 恢复 UU 窗口 ]</button>
+      <span class="toolbar-sep">|</span>
+      <button class="tui-btn tui-btn-accent" onclick="batchRules('enable_all')">[ 全部开启 ]</button>
+      <button class="tui-btn tui-btn-muted" onclick="batchRules('disable_all')">[ 全部关闭 ]</button>
+      <span class="toolbar-sep">|</span>
+      <button id="btn-autostart" class="tui-check" onclick="toggleAutostart()">[ ] 开机自启</button>
+      <button class="tui-btn tui-btn-muted" onclick="openConfigDir()">[ 配置目录 ]</button>
+    </div>
+  </header>
+
+  <!-- 1. 隧道基座 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-title">
+        <span class="section-idx">[1]</span>
+        <span>隧道基座</span>
+        <span class="section-hint">(只需在 UU 远程保留 1 条 SSH 端口映射)</span>
+      </div>
+      <div class="section-actions">
+        <button class="tui-btn tui-btn-accent" onclick="openBaseModal()">[ + 新增基座 ]</button>
+      </div>
+    </div>
+    <div class="section-body">
+      <div id="base-list" class="base-list"></div>
+    </div>
+  </section>
+
+  <!-- 2. 机器与独立端口映射规则 -->
+  <section class="section">
+    <div class="section-head">
+      <div class="section-title">
+        <span class="section-idx">[2]</span>
+        <span>机器与独立端口映射规则</span>
+      </div>
+      <div class="section-actions">
+        <div class="grep-box">
+          <span class="grep-prompt">grep&gt;</span>
+          <input
+            id="filter-query"
+            name="uutunnels_rule_search"
+            class="grep-input"
+            type="search"
+            autocomplete="off"
+            autocorrect="off"
+            autocapitalize="off"
+            spellcheck="false"
+            readonly
+            onfocus="this.removeAttribute('readonly')"
+            placeholder="过滤名称 / 端口 / IP..."
+            oninput="render()"
+          />
+          <button id="btn-clear-filter" class="tui-btn tui-btn-sm tui-btn-muted" style="display:none" onclick="clearFilter()">[x]</button>
+        </div>
+        <button id="btn-only-enabled" class="tui-check" onclick="toggleOnlyEnabled()">[ ] 仅看已开启</button>
+        <button class="tui-btn tui-btn-accent" onclick="openMachineModal()">[ + 新增机器 ]</button>
+      </div>
+    </div>
+    <div class="section-body" id="machine-list"></div>
+  </section>
+</div>
+</div><!-- /.main-pane -->
+
+<!-- 3. UU 远程窗口收纳 (右侧竖条) -->
+<aside id="uu-rail" class="uu-rail" aria-label="UU 远程窗口收纳">
+  <div class="uu-rail-expanded">
+    <div class="uu-rail-head">
+      <div class="uu-rail-head-top">
+        <div class="section-title">
+          <span class="section-idx">[3]</span>
+          <span>UU 远程窗口收纳</span>
+          <span id="uu-count" class="uu-count-badge">0</span>
+        </div>
+        <button id="btn-toggle-uu-rail" class="tui-btn tui-btn-sm tui-btn-muted" title="折叠为右侧窄条" onclick="toggleUuRail()">[»]</button>
+      </div>
+      <div class="uu-rail-hint">防误关 x 导致基座断开；仅收纳端口映射/设备窗口</div>
+    </div>
+    <div class="uu-rail-actions">
+      <button id="btn-auto-hide-uu" class="tui-check uu-rail-btn-full" onclick="toggleAutoHideUu()">[ ] 基座连上自动收纳</button>
+      <button class="tui-btn tui-btn-primary uu-rail-btn-full" onclick="hidePortmapWindows()">[ &gt;_ 一键收纳端口映射 ]</button>
+      <div class="uu-rail-btn-row">
+        <button class="tui-btn tui-btn-sm tui-btn-muted" onclick="showAllUuWindows()">[ 全部恢复 ]</button>
+        <button class="tui-btn tui-btn-sm tui-btn-muted" onclick="refreshState()">[ 刷新列表 ]</button>
+      </div>
+    </div>
+    <div class="uu-rail-body">
+      <div id="uu-list" class="uu-list"></div>
+    </div>
+  </div>
+  <button type="button" class="uu-rail-tab" title="展开 UU 远程窗口收纳" onclick="toggleUuRail()">
+    <span class="tui-btn tui-btn-sm tui-btn-muted">[«]</span>
+    <span class="uu-rail-vert-title">[3] UU 远程窗口收纳</span>
+    <span id="uu-count-collapsed" class="uu-count-badge">0</span>
+  </button>
+</aside>
+
+<!-- Modal: Base -->
+<div id="modal-base" class="modal-backdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="modal-base-title">[+] 编辑隧道基座</span>
+      <button class="tui-btn tui-btn-sm tui-btn-muted" onclick="closeModal('modal-base')">[ x ]</button>
+    </div>
+    <form class="modal-body" autocomplete="off" onsubmit="event.preventDefault(); saveBase();">
+      <input type="hidden" id="b-id" />
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label class="form-label">基座名称</label>
+          <input id="b-name" class="form-input" autocomplete="off" placeholder="如：UU-Ubuntu 基座" required />
+        </div>
+        <div class="form-row">
+          <label class="form-label">基座类型</label>
+          <select id="b-kind" class="form-select" onchange="onBaseKindChange()">
+            <option value="ssh">SSH 隧道基座</option>
+            <option value="socks5">SOCKS5 代理基座</option>
+            <option value="direct">直连 (不使用基座)</option>
+          </select>
+        </div>
+      </div>
+      <div id="b-net-fields" class="form-grid-2">
+        <div class="form-row">
+          <label class="form-label">基座主机</label>
+          <input id="b-host" class="form-input" autocomplete="off" placeholder="127.0.0.1" />
+        </div>
+        <div class="form-row">
+          <label class="form-label">基座端口</label>
+          <input id="b-port" class="form-input" type="number" min="1" max="65535" placeholder="2201" />
+        </div>
+      </div>
+      <div id="b-ssh-fields">
+        <div class="form-grid-2" style="margin-bottom:10px;">
+          <div class="form-row">
+            <label class="form-label">SSH 用户名</label>
+            <input id="b-user" name="ssh_username" class="form-input" autocomplete="off" placeholder="如：ubuntu" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">认证方式</label>
+            <select id="b-auth" class="form-select" onchange="onBaseAuthChange()">
+              <option value="password">密码认证</option>
+              <option value="private_key">私钥文件认证</option>
+            </select>
+          </div>
+        </div>
+        <div id="b-pwd-row" class="form-row">
+          <label class="form-label">SSH 密码 <span id="b-pwd-hint" class="form-hint"></span></label>
+          <input id="b-pwd" name="ssh_password" class="form-input" type="password" autocomplete="new-password" placeholder="留空表示保持原密码不变" />
+        </div>
+        <div id="b-key-rows" style="display:none;">
+          <div class="form-row" style="margin-bottom:10px;">
+            <label class="form-label">私钥路径</label>
+            <input id="b-keypath" class="form-input" autocomplete="off" placeholder="C:\Users\...\id_ed25519" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">私钥口令 (可选)</label>
+            <input id="b-keypp" name="ssh_key_passphrase" class="form-input" type="password" autocomplete="new-password" placeholder="无口令留空" />
+          </div>
+        </div>
+      </div>
+      <div class="modal-foot" style="margin:-12px; margin-top:4px;">
+        <button type="button" class="tui-btn tui-btn-muted" onclick="closeModal('modal-base')">[ 取消 ]</button>
+        <button type="submit" class="tui-btn tui-btn-primary">[ 保存并连接 ]</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Machine -->
+<div id="modal-machine" class="modal-backdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="modal-machine-title">[+] 新增机器</span>
+      <button class="tui-btn tui-btn-sm tui-btn-muted" onclick="closeModal('modal-machine')">[ x ]</button>
+    </div>
+    <form class="modal-body" autocomplete="off" onsubmit="event.preventDefault(); saveMachine();">
+      <input type="hidden" id="m-id" />
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label class="form-label">机器名称</label>
+          <input id="m-name" class="form-input" autocomplete="off" placeholder="如：lan-nas" required />
+        </div>
+        <div class="form-row">
+          <label class="form-label">备注</label>
+          <input id="m-note" class="form-input" autocomplete="off" placeholder="如：QNAP NAS" />
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label class="form-label">所属基座</label>
+          <select id="m-base" class="form-select"></select>
+        </div>
+        <div class="form-row">
+          <label class="form-label">默认目标 IP</label>
+          <input id="m-target" class="form-input" autocomplete="off" placeholder="192.168.1.100" required />
+        </div>
+      </div>
+      <div class="modal-foot" style="margin:-12px; margin-top:4px;">
+        <button type="button" class="tui-btn tui-btn-muted" onclick="closeModal('modal-machine')">[ 取消 ]</button>
+        <button type="submit" class="tui-btn tui-btn-primary">[ 保存 ]</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal: Rule -->
+<div id="modal-rule" class="modal-backdrop">
+  <div class="modal-box">
+    <div class="modal-head">
+      <span id="modal-rule-title">[+] 添加映射规则</span>
+      <button class="tui-btn tui-btn-sm tui-btn-muted" onclick="closeModal('modal-rule')">[ x ]</button>
+    </div>
+    <form class="modal-body" autocomplete="off" onsubmit="event.preventDefault(); saveRule();">
+      <input type="hidden" id="r-id" />
+      <input type="hidden" id="r-machine" />
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label class="form-label">服务名称</label>
+          <input id="r-name" class="form-input" autocomplete="off" placeholder="如：QTS 管理后台" required />
+        </div>
+        <div class="form-row">
+          <label class="form-label">协议类型</label>
+          <select id="r-proto" class="form-select" onchange="onRuleProtoChange()">
+            <option value="http">HTTP</option>
+            <option value="https">HTTPS</option>
+            <option value="ssh">SSH</option>
+            <option value="tcp">TCP</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label class="form-label">本地监听地址</label>
+          <input id="r-lhost" class="form-input" autocomplete="off" value="127.0.0.1" oninput="updateRuleUrlPreview()" required />
+        </div>
+        <div class="form-row">
+          <label class="form-label">本地端口</label>
+          <input id="r-lport" class="form-input" type="number" min="1" max="65535" oninput="updateRuleUrlPreview()" required />
+        </div>
+      </div>
+      <div class="form-grid-2">
+        <div class="form-row">
+          <label class="form-label">远端目标主机</label>
+          <input id="r-thost" class="form-input" autocomplete="off" required />
+        </div>
+        <div class="form-row">
+          <label class="form-label">远端目标端口</label>
+          <input id="r-tport" class="form-input" type="number" min="1" max="65535" required />
+        </div>
+      </div>
+      <div id="r-urlpath-row" class="form-row">
+        <label class="form-label">访问路径后缀 <span class="form-hint">(可选，如宝塔安全入口)</span></label>
+        <input id="r-urlpath" class="form-input" autocomplete="off" placeholder="如：/43235a23 或 43235a23（留空直接访问根路径）" oninput="updateRuleUrlPreview()" />
+        <div id="r-urlpath-preview" class="form-hint"></div>
+      </div>
+      <div class="modal-foot" style="margin:-12px; margin-top:4px;">
+        <button type="button" class="tui-btn tui-btn-muted" onclick="closeModal('modal-rule')">[ 取消 ]</button>
+        <button type="submit" class="tui-btn tui-btn-primary">[ 保存 ]</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+let state = {
+  bases: [],
+  machines: [],
+  rules: [],
+  uu_windows: [],
+  autostart: false,
+  auto_hide_uu: false,
+  config_path: '',
+  ui_port: 17890
+};
+let onlyEnabled = false;
+let toastTimer = null;
+
+function esc(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function fmtBytes(n) {
+  n = Number(n || 0);
+  if (n < 1024) return n + ' B';
+  if (n < 1024 * 1024) return (n / 1024).toFixed(1) + ' KB';
+  if (n < 1024 * 1024 * 1024) return (n / 1048576).toFixed(1) + ' MB';
+  return (n / 1073741824).toFixed(2) + ' GB';
+}
+
+function showToast(msg, isErr) {
+  const el = document.getElementById('toast');
+  el.textContent = (isErr ? '[ERR] ' : '[OK] ') + msg;
+  el.className = 'toast show' + (isErr ? ' err' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = 'toast'; }, 2800);
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, Object.assign({
+    headers: { 'Content-Type': 'application/json' }
+  }, opts || {}));
+  let data = {};
+  try { data = await res.json(); } catch (_) {}
+  if (!res.ok) {
+    throw new Error(data.error || data.message || ('HTTP ' + res.status));
+  }
+  return data;
+}
+
+async function refreshState() {
+  try {
+    state = await api('/api/state');
+    render();
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+function clearFilter() {
+  const inp = document.getElementById('filter-query');
+  inp.value = '';
+  render();
+}
+
+function toggleOnlyEnabled() {
+  onlyEnabled = !onlyEnabled;
+  render();
+}
+
+function baseStatusTag(b) {
+  const st = (b.runtime && b.runtime.status) || 'disconnected';
+  if (st === 'connected') {
+    const ms = b.runtime && b.runtime.latency_ms != null ? (' ' + b.runtime.latency_ms + 'ms') : '';
+    return '<span class="tui-status st-ok">[● 已连接' + esc(ms) + ']</span>';
+  }
+  if (st === 'connecting') return '<span class="tui-status st-wait">[◌ 连接中...]</span>';
+  if (st === 'needs_credentials') return '<span class="tui-status st-wait">[! 需填写凭据]</span>';
+  if (st === 'error') return '<span class="tui-status st-err">[! 异常]</span>';
+  return '<span class="tui-status st-off">[○ 未连接]</span>';
+}
+
+function protoTag(proto) {
+  const p = String(proto || 'tcp').toLowerCase();
+  if (p === 'http')  return '<span class="tui-proto tui-proto-http">[HTTP ]</span>';
+  if (p === 'https') return '<span class="tui-proto tui-proto-https">[HTTPS]</span>';
+  if (p === 'ssh')   return '<span class="tui-proto tui-proto-ssh">[SSH  ]</span>';
+  return '<span class="tui-proto tui-proto-tcp">[TCP  ]</span>';
+}
+
+function ruleStatusTag(r) {
+  const st = (r.runtime && r.runtime.status) || 'stopped';
+  if (st === 'running')      return '<span class="tui-status st-ok">[● 运行中]</span>';
+  if (st === 'waiting_base') return '<span class="tui-status st-wait">[◌ 等待基座]</span>';
+  if (st === 'error')        return '<span class="tui-status st-err">[! 异常]</span>';
+  return '<span class="tui-status st-off">[○ 已关闭]</span>';
+}
+
+function render() {
+  const rules = state.rules || [];
+  const enabledRules = rules.filter(r => r.enabled);
+  const runningRules = rules.filter(r => r.runtime && r.runtime.status === 'running');
+  let activeConns = 0, totalTraffic = 0;
+  for (const r of rules) {
+    if (r.runtime) {
+      activeConns += (r.runtime.active_conns || 0);
+      totalTraffic += (r.runtime.rx_bytes || 0) + (r.runtime.tx_bytes || 0);
+    }
+  }
+  document.getElementById('stat-running').textContent = runningRules.length + ' / ' + enabledRules.length;
+  document.getElementById('stat-total').textContent = '(共 ' + rules.length + ')';
+  document.getElementById('stat-conns').textContent = String(activeConns);
+  document.getElementById('stat-traffic').textContent = fmtBytes(totalTraffic);
+
+  const btnAuto = document.getElementById('btn-autostart');
+  btnAuto.textContent = (state.autostart ? '[x] 开机自启' : '[ ] 开机自启');
+  btnAuto.className = 'tui-check' + (state.autostart ? ' on' : '');
+
+  const btnOnly = document.getElementById('btn-only-enabled');
+  btnOnly.textContent = (onlyEnabled ? '[x] 仅看已开启' : '[ ] 仅看已开启');
+  btnOnly.className = 'tui-check' + (onlyEnabled ? ' on' : '');
+
+  const btnAutoHide = document.getElementById('btn-auto-hide-uu');
+  btnAutoHide.textContent = (state.auto_hide_uu ? '[x] 基座连上自动收纳' : '[ ] 基座连上自动收纳');
+  btnAutoHide.className = 'tui-check' + (state.auto_hide_uu ? ' on' : '');
+
+  const qInput = document.getElementById('filter-query');
+  const q = (qInput.value || '').trim().toLowerCase();
+  document.getElementById('btn-clear-filter').style.display = q ? 'inline-flex' : 'none';
+
+  // Render bases
+  const baseList = document.getElementById('base-list');
+  if (!state.bases || state.bases.length === 0) {
+    baseList.innerHTML = '<div class="empty-line">&gt; 暂无隧道基座，请点击右上角 [ + 新增基座 ]</div>';
+  } else {
+    baseList.innerHTML = state.bases.map(b => {
+      const kindLabel = b.kind === 'ssh' ? 'SSH' : (b.kind === 'socks5' ? 'SOCKS5' : 'DIRECT');
+      const credLabel = b.kind === 'ssh'
+        ? (b.auth_type === 'private_key' ? (b.key_path ? '私钥' : '未选私钥') : (b.has_password ? '已存密码' : '未设密码'))
+        : '免凭据';
+      const targetStr = b.kind === 'direct' ? '直连模式' : ((b.username ? esc(b.username) + '@' : '') + esc(b.host) + ':' + b.port);
+      const errHtml = b.runtime && b.runtime.last_error
+        ? '<div class="base-err">[ERR] ' + esc(b.runtime.last_error) + '</div>'
+        : '';
+      const toggleConnBtn = b.enabled
+        ? '<button class="tui-btn tui-btn-muted" onclick="disconnectBase(\'' + esc(b.id) + '\')">[ 断开 ]</button>'
+        : '<button class="tui-btn tui-btn-accent" onclick="reconnectBase(\'' + esc(b.id) + '\')">[ 连接 ]</button>';
+      return '<div class="base-row">' +
+        '<div class="base-info">' +
+          '<span class="base-prompt">&gt;_</span>' +
+          '<span class="base-name">' + esc(b.name) + '</span>' +
+          '<span class="base-meta">' + kindLabel + ': ' + targetStr + ' · ' + credLabel + '</span>' +
+          baseStatusTag(b) +
+        '</div>' +
+        '<div class="base-actions">' +
+          '<button class="tui-btn tui-btn-accent" onclick="openBaseModal(\'' + esc(b.id) + '\')">[ 编辑凭据 ]</button>' +
+          '<button class="tui-btn tui-btn-muted" onclick="reconnectBase(\'' + esc(b.id) + '\')">[ 重连 ]</button>' +
+          toggleConnBtn +
+          '<button class="tui-btn tui-btn-danger" onclick="deleteBase(\'' + esc(b.id) + '\')">[ 删除 ]</button>' +
+        '</div>' +
+        errHtml +
+      '</div>';
+    }).join('');
+  }
+
+  // Render machines & rules
+  const baseMap = {};
+  for (const b of (state.bases || [])) baseMap[b.id] = b;
+
+  const machineList = document.getElementById('machine-list');
+  if (!state.machines || state.machines.length === 0) {
+    machineList.innerHTML = '<div class="empty-line">&gt; 暂无机器节点，请点击 [ + 新增机器 ]</div>';
+  } else {
+    machineList.innerHTML = state.machines.map(m => {
+      const mBase = baseMap[m.base_id];
+      let mRules = rules.filter(r => r.machine_id === m.id);
+      if (onlyEnabled) mRules = mRules.filter(r => r.enabled);
+      if (q) {
+        mRules = mRules.filter(r =>
+          (r.name || '').toLowerCase().includes(q) ||
+          (r.protocol || '').toLowerCase().includes(q) ||
+          String(r.local_port).includes(q) ||
+          String(r.target_port).includes(q) ||
+          (r.target_host || '').toLowerCase().includes(q) ||
+          (r.url_path || '').toLowerCase().includes(q) ||
+          (m.name || '').toLowerCase().includes(q)
+        );
+      }
+      // Pinned first
+      mRules.sort((a, b) => (b.pinned ? 1 : 0) - (a.pinned ? 1 : 0));
+
+      const rowsHtml = mRules.length === 0
+        ? '<tr><td colspan="7" class="empty-line">&gt; 当前筛选条件下无匹配规则</td></tr>'
+        : mRules.map(r => {
+            const p = String(r.protocol || 'tcp').toLowerCase();
+            const lhost = r.local_host || '127.0.0.1';
+            const laddr = esc(lhost) + ':' + r.local_port;
+            const urlPath = (p === 'http' || p === 'https') ? normalizeUrlPath(r.url_path) : '';
+            const fullWebUrl = (p === 'http' || p === 'https') ? buildWebUrl(p, lhost, r.local_port, urlPath) : (lhost + ':' + r.local_port);
+            const laddrHtml = '<span>' + laddr + (urlPath ? '<span class="addr-path" title="' + esc(fullWebUrl) + '">' + esc(urlPath) + '</span>' : '') + '</span>';
+            const taddr = esc(r.target_host) + ':' + r.target_port;
+            const rt = r.runtime || {};
+            const speedParts = [];
+            if (rt.tx_bps > 0) speedParts.push('↑' + fmtBytes(rt.tx_bps) + '/s');
+            if (rt.rx_bps > 0) speedParts.push('↓' + fmtBytes(rt.rx_bps) + '/s');
+            const statsText = '连接 ' + (rt.active_conns || 0) + ' · ' + fmtBytes((rt.rx_bytes || 0) + (rt.tx_bytes || 0)) +
+              (speedParts.length ? ' · ' + speedParts.join(' ') : '');
+
+            let addrBtns = '';
+            if ((p === 'http' || p === 'https') && rt.status === 'running') {
+              addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-cyan" title="' + esc(fullWebUrl) + '" onclick="openWebRule(\'' + esc(r.id) + '\')">[打开↗]</button>';
+            }
+            if (p === 'ssh') {
+              addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-muted" onclick="copyRuleAddr(\'' + esc(r.id) + '\')">[复制SSH]</button>';
+              if (rt.status === 'running') {
+                addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-accent" onclick="openSshTerm(\'' + esc(r.id) + '\')">[&gt;_终端]</button>';
+              }
+            } else {
+              addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-muted" title="' + esc(fullWebUrl) + '" onclick="copyRuleAddr(\'' + esc(r.id) + '\')">[复制]</button>';
+            }
+
+            const errTip = rt.last_error
+              ? '<div class="rule-err-line" title="' + esc(rt.last_error) + '">[!] ' + esc(rt.last_error) + '</div>'
+              : '';
+
+            return '<tr>' +
+              '<td>' +
+                '<button class="tui-switch ' + (r.enabled ? 'on' : 'off') + '" onclick="toggleRule(\'' + esc(r.id) + '\',' + (!r.enabled) + ')">' +
+                  (r.enabled ? '[■ ON ]' : '[  OFF]') +
+                '</button> ' +
+                '<button class="tui-pin ' + (r.pinned ? 'on' : 'off') + '" title="置顶到托盘菜单" onclick="pinRule(\'' + esc(r.id) + '\',' + (!r.pinned) + ')">' +
+                  (r.pinned ? '[★]' : '[·]') +
+                '</button>' +
+              '</td>' +
+              '<td>' + protoTag(p) + '</td>' +
+              '<td class="td-name">' + esc(r.name) + '</td>' +
+              '<td class="td-addr"><span class="addr-cell">' + laddrHtml + addrBtns + '</span></td>' +
+              '<td class="td-target">-&gt; ' + taddr + '</td>' +
+              '<td class="td-status">' + ruleStatusTag(r) + ' <span class="td-stats">' + esc(statsText) + '</span>' + errTip + '</td>' +
+              '<td><div class="td-ops">' +
+                '<button class="tui-btn tui-btn-sm tui-btn-muted" onclick="probeRule(\'' + esc(r.id) + '\')">[测通]</button>' +
+                '<button class="tui-btn tui-btn-sm tui-btn-muted" onclick="openRuleModal(\'' + esc(m.id) + '\',\'' + esc(r.id) + '\')">[编辑]</button>' +
+                '<button class="tui-btn tui-btn-sm tui-btn-danger" onclick="deleteRule(\'' + esc(r.id) + '\')">[删除]</button>' +
+              '</div></td>' +
+            '</tr>';
+          }).join('');
+
+      const metaText = (m.note && m.note.includes(m.default_target_host))
+        ? m.note
+        : (m.default_target_host + (m.note ? ' · ' + m.note : ''));
+
+      return '<div class="machine-card">' +
+        '<div class="machine-head">' +
+          '<div class="machine-title">' +
+            '<span class="machine-badge">[NODE]</span>' +
+            '<span class="machine-name">' + esc(m.name) + '</span>' +
+            '<span class="machine-meta">' + esc(metaText) + '</span>' +
+            '<span class="machine-base-tag">基座: ' + esc(mBase ? mBase.name : '未绑定') + '</span>' +
+          '</div>' +
+          '<div class="machine-actions">' +
+            '<button class="tui-btn tui-btn-accent" onclick="openRuleModal(\'' + esc(m.id) + '\')">[ + 添加规则 ]</button>' +
+            '<button class="tui-btn tui-btn-muted" onclick="batchRules(\'enable_machine\',\'' + esc(m.id) + '\')">[ 本机全开 ]</button>' +
+            '<button class="tui-btn tui-btn-muted" onclick="batchRules(\'disable_machine\',\'' + esc(m.id) + '\')">[ 本机全关 ]</button>' +
+            '<button class="tui-btn tui-btn-muted" onclick="openMachineModal(\'' + esc(m.id) + '\')">[ 编辑 ]</button>' +
+            '<button class="tui-btn tui-btn-danger" onclick="deleteMachine(\'' + esc(m.id) + '\')">[ 删除 ]</button>' +
+          '</div>' +
+        '</div>' +
+        '<div class="table-wrap">' +
+          '<table class="tui-table">' +
+            '<thead><tr>' +
+              '<th style="width:118px">开关 / 置顶</th>' +
+              '<th style="width:76px">协议</th>' +
+              '<th>服务名称</th>' +
+              '<th>本地访问地址</th>' +
+              '<th>远端目标</th>' +
+              '<th>状态 / 实时速率</th>' +
+              '<th style="width:175px">操作</th>' +
+            '</tr></thead>' +
+            '<tbody>' + rowsHtml + '</tbody>' +
+          '</table>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+
+  // Render UU windows (far-right vertical rail)
+  const uuList = document.getElementById('uu-list');
+  const wins = state.uu_windows || [];
+  const uuCountEl = document.getElementById('uu-count');
+  const uuCountCollapsedEl = document.getElementById('uu-count-collapsed');
+  if (uuCountEl) uuCountEl.textContent = String(wins.length);
+  if (uuCountCollapsedEl) uuCountCollapsedEl.textContent = String(wins.length);
+  if (wins.length === 0) {
+    uuList.innerHTML = '<div class="empty-line">&gt; 未检测到运行中的 网易UU远程 (GameViewer.exe) 窗口</div>';
+  } else {
+    uuList.innerHTML = wins.map(w => {
+      const kindTag = w.is_portmap_likely
+        ? '<span class="uu-tag uu-tag-portmap">[端口映射/设备]</span>'
+        : (w.is_main_window
+            ? '<span class="uu-tag uu-tag-main">[UU 主窗口]</span>'
+            : '<span class="uu-tag uu-tag-main">[其他窗口]</span>');
+      const stateTag = !w.visible
+        ? (w.hidden_by_us
+            ? '<span class="tui-status st-ok">[● 已收纳]</span>'
+            : '<span class="tui-status st-wait">[● 已隐藏]</span>')
+        : '<span class="tui-status st-off">[○ 可见]</span>';
+      const actionBtn = w.visible
+        ? '<button class="tui-btn tui-btn-sm tui-btn-accent" onclick="hideUuWindow(' + w.hwnd + ')">[ 隐藏收纳 ]</button>'
+        : '<button class="tui-btn tui-btn-sm tui-btn-primary" onclick="showUuWindow(' + w.hwnd + ')">[ 恢复显示 ]</button>';
+      const titleText = w.title || '(无标题)';
+      return '<div class="uu-row">' +
+        '<div class="uu-card-top">' +
+          '<span class="base-prompt">&gt;_</span>' +
+          '<span class="uu-title" title="' + esc(titleText) + '">' + esc(titleText) + '</span>' +
+        '</div>' +
+        '<div class="uu-card-tags">' + kindTag + stateTag + '</div>' +
+        '<div class="uu-card-foot">' +
+          '<span class="uu-meta" title="PID ' + w.pid + ' · HWND ' + w.hwnd + '">PID ' + w.pid + ' · ' + w.hwnd + '</span>' +
+          actionBtn +
+        '</div>' +
+      '</div>';
+    }).join('');
+  }
+}
+
+/* Actions */
+async function toggleRule(id, enabled) {
+  try {
+    await api('/api/rules/' + encodeURIComponent(id) + '/toggle', {
+      method: 'POST',
+      body: JSON.stringify({ enabled })
+    });
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function pinRule(id, pinned) {
+  try {
+    await api('/api/rules/' + encodeURIComponent(id) + '/pin', {
+      method: 'POST',
+      body: JSON.stringify({ pinned })
+    });
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function batchRules(action, machineId) {
+  try {
+    await api('/api/rules/batch', {
+      method: 'POST',
+      body: JSON.stringify({ action, machine_id: machineId || null })
+    });
+    showToast('批量操作已执行');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function probeRule(id) {
+  try {
+    showToast('正在测通...');
+    const res = await api('/api/rules/' + encodeURIComponent(id) + '/probe', { method: 'POST' });
+    if (res.ok) {
+      showToast('测通成功 (' + (res.latency_ms ?? 0) + ' ms): ' + (res.detail || '可达'));
+    } else {
+      showToast('测通失败: ' + (res.detail || '不可达'), true);
+    }
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function openSshTerm(id) {
+  try {
+    const res = await api('/api/rules/' + encodeURIComponent(id) + '/open-ssh', { method: 'POST' });
+    showToast('已启动终端: ' + (res.command || ''));
+  } catch (e) { showToast(e.message, true); }
+}
+
+function normalizeUrlPath(raw) {
+  const s = String(raw ?? '').replace(/[\r\n]/g, '').trim();
+  if (!s) return '';
+  if (s.startsWith('/') || s.startsWith('?') || s.startsWith('#')) return s;
+  return '/' + s;
+}
+
+function buildWebUrl(proto, host, port, urlPath) {
+  const p = String(proto || 'http').toLowerCase();
+  const h = (host || '127.0.0.1').trim() || '127.0.0.1';
+  return p + '://' + h + ':' + port + normalizeUrlPath(urlPath);
+}
+
+function openWebRule(id) {
+  const r = (state.rules || []).find(x => x.id === id);
+  if (!r) return;
+  const p = String(r.protocol || 'http').toLowerCase();
+  window.open(buildWebUrl(p, r.local_host, r.local_port, r.url_path), '_blank', 'noopener');
+}
+
+function copyRuleAddr(id) {
+  const r = (state.rules || []).find(x => x.id === id);
+  if (!r) return;
+  const p = String(r.protocol || 'tcp').toLowerCase();
+  const lhost = (r.local_host || '127.0.0.1').trim() || '127.0.0.1';
+  if (p === 'ssh') {
+    copyText('ssh root@' + lhost + ' -p ' + r.local_port, '已复制 SSH 命令');
+  } else if (p === 'http' || p === 'https') {
+    copyText(buildWebUrl(p, lhost, r.local_port, r.url_path), '已复制地址');
+  } else {
+    copyText(lhost + ':' + r.local_port, '已复制地址');
+  }
+}
+
+async function copyText(text, msg) {
+  try {
+    await navigator.clipboard.writeText(text);
+    showToast((msg || '已复制') + ': ' + text);
+  } catch (_) {
+    showToast(text);
+  }
+}
+
+async function reconnectBase(id) {
+  try {
+    await api('/api/bases/' + encodeURIComponent(id) + '/reconnect', { method: 'POST' });
+    showToast('正在连接基座...');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function disconnectBase(id) {
+  try {
+    await api('/api/bases/' + encodeURIComponent(id) + '/disconnect', { method: 'POST' });
+    showToast('基座已断开');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function deleteBase(id) {
+  if (!confirm('确认删除该隧道基座？')) return;
+  try {
+    await api('/api/bases/' + encodeURIComponent(id), { method: 'DELETE' });
+    showToast('已删除基座');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function deleteMachine(id) {
+  if (!confirm('确认删除该机器及其下属规则？')) return;
+  try {
+    await api('/api/machines/' + encodeURIComponent(id), { method: 'DELETE' });
+    showToast('已删除机器');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function deleteRule(id) {
+  if (!confirm('确认删除该映射规则？')) return;
+  try {
+    await api('/api/rules/' + encodeURIComponent(id), { method: 'DELETE' });
+    showToast('已删除规则');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function hideUuWindow(hwnd) {
+  try {
+    await api('/api/uu/hide/' + hwnd, { method: 'POST' });
+    showToast('已收纳窗口 HWND ' + hwnd);
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function showUuWindow(hwnd) {
+  try {
+    await api('/api/uu/show/' + hwnd, { method: 'POST' });
+    showToast('已恢复窗口 HWND ' + hwnd);
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function hidePortmapWindows() {
+  try {
+    const res = await api('/api/uu/hide-portmap', { method: 'POST' });
+    showToast('已收纳 ' + (res.hidden_count ?? res.count ?? 0) + ' 个端口映射窗口');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function showAllUuWindows() {
+  try {
+    const res = await api('/api/uu/show-all', { method: 'POST' });
+    showToast('已恢复 ' + (res.restored_count ?? res.count ?? 0) + ' 个隐藏窗口');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function toggleAutostart() {
+  try {
+    await api('/api/settings/autostart', {
+      method: 'POST',
+      body: JSON.stringify({ enabled: !state.autostart })
+    });
+    showToast(!state.autostart ? '已开启开机自启' : '已关闭开机自启');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function toggleAutoHideUu() {
+  try {
+    await api('/api/settings/auto-hide-uu', {
+      method: 'POST',
+      body: JSON.stringify({ enabled: !state.auto_hide_uu })
+    });
+    showToast(!state.auto_hide_uu ? '已开启：基座连上自动收纳端口映射窗口' : '已关闭自动收纳');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function openConfigDir() {
+  try {
+    await api('/api/app/open-config-dir', { method: 'POST' });
+    showToast('已打开配置目录');
+  } catch (e) { showToast(e.message, true); }
+}
+
+/* Modals */
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+function onBaseKindChange() {
+  const kind = document.getElementById('b-kind').value;
+  document.getElementById('b-net-fields').style.display = kind === 'direct' ? 'none' : 'grid';
+  document.getElementById('b-ssh-fields').style.display = kind === 'ssh' ? 'block' : 'none';
+}
+
+function onBaseAuthChange() {
+  const auth = document.getElementById('b-auth').value;
+  document.getElementById('b-pwd-row').style.display = auth === 'password' ? 'flex' : 'none';
+  document.getElementById('b-key-rows').style.display = auth === 'private_key' ? 'block' : 'none';
+}
+
+function openBaseModal(id) {
+  const b = id ? (state.bases || []).find(x => x.id === id) : null;
+  document.getElementById('modal-base-title').textContent = b ? '[+] 编辑隧道基座' : '[+] 新增隧道基座';
+  document.getElementById('b-id').value = b ? b.id : '';
+  document.getElementById('b-name').value = b ? b.name : '';
+  document.getElementById('b-kind').value = b ? b.kind : 'ssh';
+  document.getElementById('b-host').value = b ? b.host : '127.0.0.1';
+  document.getElementById('b-port').value = b ? b.port : 2201;
+  document.getElementById('b-user').value = b ? (b.username || '') : '';
+  document.getElementById('b-auth').value = b ? (b.auth_type || 'password') : 'password';
+  document.getElementById('b-pwd').value = '';
+  document.getElementById('b-pwd-hint').textContent = (b && b.has_password) ? '(已保存密码，留空则不修改)' : '';
+  document.getElementById('b-keypath').value = b ? (b.key_path || '') : '';
+  document.getElementById('b-keypp').value = '';
+  onBaseKindChange();
+  onBaseAuthChange();
+  document.getElementById('modal-base').classList.add('open');
+}
+
+async function saveBase() {
+  const id = document.getElementById('b-id').value.trim();
+  const payload = {
+    name: document.getElementById('b-name').value.trim(),
+    kind: document.getElementById('b-kind').value,
+    host: document.getElementById('b-host').value.trim() || '127.0.0.1',
+    port: Number(document.getElementById('b-port').value || 22),
+    username: document.getElementById('b-user').value.trim(),
+    auth_type: document.getElementById('b-auth').value,
+    password: document.getElementById('b-pwd').value || null,
+    key_path: document.getElementById('b-keypath').value.trim() || null,
+    key_passphrase: document.getElementById('b-keypp').value || null,
+    enabled: true
+  };
+  try {
+    if (id) {
+      await api('/api/bases/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('已更新基座并重连');
+    } else {
+      await api('/api/bases', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('已创建基座并连接');
+    }
+    closeModal('modal-base');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+function openMachineModal(id) {
+  const m = id ? (state.machines || []).find(x => x.id === id) : null;
+  document.getElementById('modal-machine-title').textContent = m ? '[+] 编辑机器' : '[+] 新增机器';
+  document.getElementById('m-id').value = m ? m.id : '';
+  document.getElementById('m-name').value = m ? m.name : '';
+  document.getElementById('m-note').value = m ? (m.note || '') : '';
+  document.getElementById('m-target').value = m ? m.default_target_host : '127.0.0.1';
+  const sel = document.getElementById('m-base');
+  sel.innerHTML = (state.bases || []).map(b =>
+    '<option value="' + esc(b.id) + '">' + esc(b.name) + '</option>'
+  ).join('');
+  if (m && m.base_id) sel.value = m.base_id;
+  document.getElementById('modal-machine').classList.add('open');
+}
+
+async function saveMachine() {
+  const id = document.getElementById('m-id').value.trim();
+  const payload = {
+    name: document.getElementById('m-name').value.trim(),
+    note: document.getElementById('m-note').value.trim(),
+    base_id: document.getElementById('m-base').value,
+    default_target_host: document.getElementById('m-target').value.trim()
+  };
+  try {
+    if (id) {
+      await api('/api/machines/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('已更新机器');
+    } else {
+      await api('/api/machines', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('已新增机器');
+    }
+    closeModal('modal-machine');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+function onRuleProtoChange() {
+  const proto = document.getElementById('r-proto').value;
+  const row = document.getElementById('r-urlpath-row');
+  const isWeb = (proto === 'http' || proto === 'https');
+  row.style.display = isWeb ? 'flex' : 'none';
+  updateRuleUrlPreview();
+}
+
+function updateRuleUrlPreview() {
+  const proto = document.getElementById('r-proto').value;
+  const el = document.getElementById('r-urlpath-preview');
+  if (proto !== 'http' && proto !== 'https') {
+    el.textContent = '';
+    return;
+  }
+  const lhost = document.getElementById('r-lhost').value.trim() || '127.0.0.1';
+  const lport = document.getElementById('r-lport').value.trim() || '<端口>';
+  const suffix = normalizeUrlPath(document.getElementById('r-urlpath').value);
+  el.textContent = '完整访问地址: ' + proto + '://' + lhost + ':' + lport + suffix;
+}
+
+function openRuleModal(machineId, ruleId) {
+  const m = (state.machines || []).find(x => x.id === machineId);
+  const r = ruleId ? (state.rules || []).find(x => x.id === ruleId) : null;
+  document.getElementById('modal-rule-title').textContent = r ? '[+] 编辑映射规则' : '[+] 添加映射规则';
+  document.getElementById('r-id').value = r ? r.id : '';
+  document.getElementById('r-machine').value = r ? r.machine_id : machineId;
+  document.getElementById('r-name').value = r ? r.name : '';
+  document.getElementById('r-proto').value = r ? (r.protocol || 'http') : 'http';
+  document.getElementById('r-lhost').value = r ? (r.local_host || '127.0.0.1') : '127.0.0.1';
+  document.getElementById('r-lport').value = r ? r.local_port : '';
+  document.getElementById('r-thost').value = r ? r.target_host : (m ? m.default_target_host : '127.0.0.1');
+  document.getElementById('r-tport').value = r ? r.target_port : '';
+  document.getElementById('r-urlpath').value = r ? (r.url_path || '') : '';
+  onRuleProtoChange();
+  document.getElementById('modal-rule').classList.add('open');
+}
+
+async function saveRule() {
+  const id = document.getElementById('r-id').value.trim();
+  const existing = id ? (state.rules || []).find(x => x.id === id) : null;
+  const proto = document.getElementById('r-proto').value;
+  const urlPath = (proto === 'http' || proto === 'https')
+    ? normalizeUrlPath(document.getElementById('r-urlpath').value)
+    : '';
+  const payload = {
+    machine_id: document.getElementById('r-machine').value,
+    name: document.getElementById('r-name').value.trim(),
+    protocol: proto,
+    local_host: document.getElementById('r-lhost').value.trim() || '127.0.0.1',
+    local_port: Number(document.getElementById('r-lport').value),
+    target_host: document.getElementById('r-thost').value.trim(),
+    target_port: Number(document.getElementById('r-tport').value),
+    url_path: urlPath,
+    enabled: existing ? Boolean(existing.enabled) : true,
+    pinned: existing ? Boolean(existing.pinned) : false
+  };
+  try {
+    if (id) {
+      await api('/api/rules/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(payload) });
+      showToast('已更新映射规则');
+    } else {
+      await api('/api/rules', { method: 'POST', body: JSON.stringify(payload) });
+      showToast('已添加映射规则');
+    }
+    closeModal('modal-rule');
+    await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+const UU_RAIL_STORAGE_KEY = 'uutunnels_uu_rail_collapsed';
+
+function applyUuRailState() {
+  let collapsed = false;
+  try {
+    collapsed = localStorage.getItem(UU_RAIL_STORAGE_KEY) === '1';
+  } catch (_) {}
+  document.body.classList.toggle('uu-rail-collapsed', collapsed);
+}
+
+function toggleUuRail() {
+  const collapsed = !document.body.classList.contains('uu-rail-collapsed');
+  document.body.classList.toggle('uu-rail-collapsed', collapsed);
+  try {
+    localStorage.setItem(UU_RAIL_STORAGE_KEY, collapsed ? '1' : '0');
+  } catch (_) {}
+}
+
+// Clear any accidental browser autofill before initial render
+document.getElementById('filter-query').value = '';
+applyUuRailState();
+refreshState();
+setInterval(refreshState, 2000);
+</script>
+</body>
+</html>
