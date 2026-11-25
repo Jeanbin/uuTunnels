@@ -549,6 +549,11 @@ mod tests {
             target_host: "127.0.0.1".into(),
             target_port: echo_port,
             url_path: String::new(),
+            ssh_username: None,
+            ssh_auth_type: None,
+            ssh_password: None,
+            ssh_key_path: None,
+            ssh_key_passphrase: None,
             enabled: true,
             pinned: false,
         };
@@ -610,5 +615,34 @@ mod tests {
             io::ErrorKind::TimedOut,
             "timeout"
         )));
+    }
+
+    #[test]
+    fn rule_equal_ignores_ssh_credential_changes() {
+        let base_rule = ForwardRule {
+            id: "r-ssh".into(),
+            machine_id: "m1".into(),
+            name: "SSH".into(),
+            protocol: "ssh".into(),
+            local_host: "127.0.0.1".into(),
+            local_port: 2202,
+            target_host: "127.0.0.1".into(),
+            target_port: 22,
+            url_path: String::new(),
+            ssh_username: Some("ubuntu".into()),
+            ssh_auth_type: Some(AuthType::Password),
+            ssh_password: Some("old".into()),
+            ssh_key_path: None,
+            ssh_key_passphrase: None,
+            enabled: true,
+            pinned: false,
+        };
+        let mut updated = base_rule.clone();
+        updated.ssh_username = Some("root".into());
+        updated.ssh_auth_type = Some(AuthType::PrivateKey);
+        updated.ssh_password = None;
+        updated.ssh_key_path = Some("~/.ssh/id_ed25519".into());
+        updated.ssh_key_passphrase = Some("pp".into());
+        assert!(rule_equal(&base_rule, &updated));
     }
 }

@@ -2,6 +2,7 @@ use crate::autostart;
 use crate::config::{self, AppConfig, AuthType, BaseKind, ForwardRule, Machine, TunnelBase};
 use crate::forwarder::{ForwarderManager, RuleRuntimeSnapshot};
 use crate::ssh_engine::{BaseRuntimeSnapshot, SshEngine};
+use crate::ssh_terminal::{self, AskpassStore};
 use crate::uu_window::{self, UuWindowInfo};
 use axum::extract::{Path, State};
 use axum::http::StatusCode;
@@ -23,6 +24,7 @@ pub struct AppState {
     pub config: Arc<RwLock<AppConfig>>,
     pub ssh: Arc<SshEngine>,
     pub forwarder: Arc<ForwarderManager>,
+    pub askpass: Arc<AskpassStore>,
     pub ui_boot_id: String,
     pub ui_reload_seq: Arc<AtomicU64>,
 }
@@ -54,6 +56,12 @@ struct RuleView {
     target_host: String,
     target_port: u16,
     url_path: String,
+    ssh_username: Option<String>,
+    ssh_auth_type: Option<AuthType>,
+    ssh_has_password: bool,
+    ssh_key_path: Option<String>,
+    ssh_has_key_passphrase: bool,
+    effective_ssh_username: Option<String>,
     enabled: bool,
     pinned: bool,
     runtime: RuleRuntimeSnapshot,
@@ -67,6 +75,7 @@ struct StateResponse {
     uu_windows: Vec<UuWindowInfo>,
     autostart: bool,
     auto_hide_uu: bool,
+    ssh_terminal: config::SshTerminalConfig,
     config_path: String,
     ui_port: u16,
     ui_boot_id: String,
@@ -103,6 +112,9 @@ pub fn build_router(state: AppState) -> Router {
         .route("/api/uu/show-all", post(show_all_uu))
         .route("/api/settings/autostart", post(set_autostart))
         .route("/api/settings/auto-hide-uu", post(set_auto_hide_uu))
+        .route("/api/ssh-terminals", get(list_ssh_terminals))
+        .route("/api/settings/ssh-terminal", post(set_ssh_terminal))
+        .route("/api/internal/askpass/{token}", post(consume_askpass))
         .route("/api/app/open-config-dir", post(open_config_dir))
         .with_state(state)
 }
@@ -128,6 +140,15 @@ async fn build_state_payload(state: &AppState) -> StateResponse {
     let cfg = state.config.read().await.clone();
     let base_snaps = state.ssh.snapshot_all().await;
     let rule_snaps = state.forwarder.snapshot_all().await;
+
+    let effective_ssh_users: std::collections::HashMap<String, Option<String>> = cfg
+        .rules
+        .iter()
+        .filter(|r| r.protocol.eq_ignore_ascii_case("ssh"))
+        .map(|r| (r.id.clone(), ssh_terminal::resolve_effective_ssh_username(&cfg, r)))
+        .collect();
+
+    let ssh_terminal_cfg = cfg.ssh_terminal.clone();
 
     let bases = cfg
         .bases
@@ -173,6 +194,13 @@ async fn build_state_payload(state: &AppState) -> StateResponse {
                 tx_bps: 0,
                 last_error: None,
             });
+            let ssh_has_password = r.ssh_password.as_deref().map(|s| !s.is_empty()).unwrap_or(false);
+            let ssh_has_key_passphrase = r
+                .ssh_key_passphrase
+                .as_deref()
+                .map(|s| !s.is_empty())
+                .unwrap_or(false);
+            let effective_ssh_username = effective_ssh_users.get(&r.id).cloned().flatten();
             RuleView {
                 id: r.id,
                 machine_id: r.machine_id,
@@ -183,6 +211,12 @@ async fn build_state_payload(state: &AppState) -> StateResponse {
                 target_host: r.target_host,
                 target_port: r.target_port,
                 url_path: config::normalize_url_path(&r.url_path),
+                ssh_username: r.ssh_username,
+                ssh_auth_type: r.ssh_auth_type,
+                ssh_has_password,
+                ssh_key_path: r.ssh_key_path,
+                ssh_has_key_passphrase,
+                effective_ssh_username,
                 enabled: r.enabled,
                 pinned: r.pinned,
                 runtime: rt,
@@ -204,6 +238,7 @@ async fn build_state_payload(state: &AppState) -> StateResponse {
         uu_windows,
         autostart: auto,
         auto_hide_uu: cfg.auto_hide_uu,
+        ssh_terminal: ssh_terminal_cfg,
         config_path: state.config_path.display().to_string(),
         ui_port: cfg.ui_port,
         ui_boot_id: state.ui_boot_id.clone(),
@@ -482,6 +517,20 @@ struct RuleInput {
     #[serde(default)]
     url_path: String,
     #[serde(default)]
+    ssh_username: Option<String>,
+    #[serde(default)]
+    ssh_auth_type: Option<AuthType>,
+    #[serde(default)]
+    ssh_password: Option<String>,
+    #[serde(default)]
+    clear_ssh_password: bool,
+    #[serde(default)]
+    ssh_key_path: Option<String>,
+    #[serde(default)]
+    ssh_key_passphrase: Option<String>,
+    #[serde(default)]
+    clear_ssh_key_passphrase: bool,
+    #[serde(default)]
     enabled: bool,
     #[serde(default)]
     pinned: bool,
@@ -517,6 +566,25 @@ async fn create_rule(
         String::new()
     };
 
+    let (ssh_username, ssh_auth_type, ssh_password, ssh_key_path, ssh_key_passphrase) =
+        if protocol == "ssh" {
+            (
+                input
+                    .ssh_username
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty()),
+                input.ssh_auth_type,
+                input.ssh_password.filter(|s| !s.is_empty()),
+                input
+                    .ssh_key_path
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty()),
+                input.ssh_key_passphrase.filter(|s| !s.is_empty()),
+            )
+        } else {
+            (None, None, None, None, None)
+        };
+
     {
         let mut cfg = state.config.write().await;
         if !cfg.machines.iter().any(|m| m.id == input.machine_id) {
@@ -536,6 +604,11 @@ async fn create_rule(
             target_host: input.target_host.trim().to_string(),
             target_port: input.target_port,
             url_path,
+            ssh_username,
+            ssh_auth_type,
+            ssh_password,
+            ssh_key_path,
+            ssh_key_passphrase,
             enabled: input.enabled,
             pinned: input.pinned,
         });
@@ -576,7 +649,7 @@ async fn update_rule(
         };
         r.machine_id = input.machine_id;
         r.name = input.name.trim().to_string();
-        r.protocol = protocol;
+        r.protocol = protocol.clone();
         r.local_host = local_host;
         r.local_port = input.local_port;
         r.target_host = input.target_host.trim().to_string();
@@ -584,6 +657,40 @@ async fn update_rule(
         r.url_path = url_path;
         r.enabled = input.enabled;
         r.pinned = input.pinned;
+
+        if protocol == "ssh" {
+            r.ssh_username = input
+                .ssh_username
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            if input.ssh_auth_type.is_some() {
+                r.ssh_auth_type = input.ssh_auth_type;
+            }
+            if input.clear_ssh_password {
+                r.ssh_password = None;
+            } else if let Some(pwd) = input.ssh_password {
+                if !pwd.is_empty() {
+                    r.ssh_password = Some(pwd);
+                }
+            }
+            r.ssh_key_path = input
+                .ssh_key_path
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty());
+            if input.clear_ssh_key_passphrase {
+                r.ssh_key_passphrase = None;
+            } else if let Some(pp) = input.ssh_key_passphrase {
+                if !pp.is_empty() {
+                    r.ssh_key_passphrase = Some(pp);
+                }
+            }
+        } else {
+            r.ssh_username = None;
+            r.ssh_auth_type = None;
+            r.ssh_password = None;
+            r.ssh_key_path = None;
+            r.ssh_key_passphrase = None;
+        }
     }
 
     if let Err(e) = save_and_sync(&state).await {
@@ -667,52 +774,63 @@ async fn probe_rule_handler(
     Json(res).into_response()
 }
 
+#[derive(Deserialize, Default)]
+struct OpenSshBody {
+    #[serde(default)]
+    terminal_kind: Option<String>,
+}
+
 async fn open_ssh_terminal(
     State(state): State<AppState>,
     Path(id): Path<String>,
+    body: Option<Json<OpenSshBody>>,
 ) -> impl IntoResponse {
-    let (rule, ssh_user) = {
-        let cfg = state.config.read().await;
-        let Some(r) = cfg.rules.iter().find(|r| r.id == id).cloned() else {
-            return err_resp(StatusCode::NOT_FOUND, "未找到该映射规则").into_response();
-        };
-        let machine = cfg.machines.iter().find(|m| m.id == r.machine_id);
-        let user = machine
-            .and_then(|m| {
-                // Use base username when forwarding directly to the base host (127.0.0.1)
-                if r.target_host == "127.0.0.1" || r.target_host == "localhost" {
-                    cfg.bases
-                        .iter()
-                        .find(|b| b.id == m.base_id)
-                        .map(|b| b.username.clone())
-                } else {
-                    None
-                }
-            })
-            .filter(|u| !u.trim().is_empty());
-        (r, user)
-    };
+    let req_kind = body
+        .and_then(|b| b.0.terminal_kind)
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty());
 
-    let target = match ssh_user {
-        Some(u) => format!("{u}@{}", rule.local_host),
-        None => rule.local_host.clone(),
-    };
-    let port_str = rule.local_port.to_string();
-
-    let launched = std::process::Command::new("wt.exe")
-        .args(["ssh", "-p", &port_str, &target])
-        .spawn()
-        .is_ok();
-
-    if !launched {
-        let ps_cmd = format!("ssh -p {port_str} {target}");
-        let _ = std::process::Command::new("powershell.exe")
-            .args(["-NoExit", "-Command", &ps_cmd])
-            .spawn();
+    if let Some(ref k) = req_kind {
+        if !ssh_terminal::is_valid_terminal_kind(k) {
+            return err_resp(StatusCode::BAD_REQUEST, format!("不支持的 SSH 终端类型: {k}"))
+                .into_response();
+        }
     }
 
-    Json(serde_json::json!({ "ok": true, "command": format!("ssh -p {port_str} {target}") }))
-        .into_response()
+    let (spec, mut term_cfg, ui_port) = {
+        let cfg = state.config.read().await;
+        let Some(r) = cfg.rules.iter().find(|r| r.id == id) else {
+            return err_resp(StatusCode::NOT_FOUND, "未找到该映射规则").into_response();
+        };
+        let spec = ssh_terminal::build_connection_spec(&cfg, r);
+        (spec, cfg.ssh_terminal.clone(), cfg.ui_port)
+    };
+
+    if let Some(k) = req_kind {
+        if k != term_cfg.kind {
+            term_cfg.kind = k;
+            term_cfg.custom_path.clear();
+            term_cfg.custom_args.clear();
+        }
+    }
+
+    let askpass = state.askpass.clone();
+    let res = tokio::task::spawn_blocking(move || {
+        ssh_terminal::launch_ssh_terminal(&spec, &term_cfg, Some((&askpass, ui_port)))
+    })
+    .await;
+
+    match res {
+        Ok(Ok(info)) => Json(serde_json::json!({
+            "ok": true,
+            "terminal_id": info.terminal_id,
+            "terminal_name": info.terminal_name,
+            "command": info.display_command,
+        }))
+        .into_response(),
+        Ok(Err(e)) => err_resp(StatusCode::BAD_REQUEST, e.to_string()).into_response(),
+        Err(e) => err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response(),
+    }
 }
 
 #[derive(Deserialize)]
@@ -844,6 +962,67 @@ async fn set_auto_hide_uu(
     Json(build_state_payload(&state).await).into_response()
 }
 
+#[derive(Deserialize)]
+struct SshTerminalBody {
+    kind: String,
+    #[serde(default)]
+    custom_path: String,
+    #[serde(default)]
+    custom_args: String,
+}
+
+async fn list_ssh_terminals(State(state): State<AppState>) -> impl IntoResponse {
+    let selected = state.config.read().await.ssh_terminal.clone();
+    let terminals = tokio::task::spawn_blocking(ssh_terminal::detect_terminals)
+        .await
+        .unwrap_or_default();
+    Json(serde_json::json!({
+        "selected": selected,
+        "terminals": terminals,
+    }))
+}
+
+async fn set_ssh_terminal(
+    State(state): State<AppState>,
+    Json(body): Json<SshTerminalBody>,
+) -> impl IntoResponse {
+    let kind = body.kind.trim().to_string();
+    if !ssh_terminal::is_valid_terminal_kind(&kind) {
+        return err_resp(StatusCode::BAD_REQUEST, format!("不支持的 SSH 终端类型: {kind}"))
+            .into_response();
+    }
+    let custom_path = body.custom_path.trim().to_string();
+    let custom_args = body.custom_args.trim().to_string();
+    if kind == "custom" && custom_path.is_empty() {
+        return err_resp(StatusCode::BAD_REQUEST, "自定义 SSH 终端路径不能为空")
+            .into_response();
+    }
+
+    let cfg_snapshot = {
+        let mut cfg = state.config.write().await;
+        cfg.ssh_terminal = config::SshTerminalConfig {
+            kind,
+            custom_path,
+            custom_args,
+        };
+        cfg.clone()
+    };
+    if let Err(e) = config::save(&state.config_path, &cfg_snapshot) {
+        return err_resp(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    }
+    Json(build_state_payload(&state).await).into_response()
+}
+
+async fn consume_askpass(
+    State(state): State<AppState>,
+    Path(token): Path<String>,
+) -> impl IntoResponse {
+    match state.askpass.consume(&token) {
+        Some(secret) => (StatusCode::OK, secret).into_response(),
+        None => (StatusCode::NOT_FOUND, "not found").into_response(),
+    }
+}
+
 async fn open_config_dir(State(state): State<AppState>) -> impl IntoResponse {
     let p = state.config_path.clone();
     let _ = std::process::Command::new("explorer.exe")
@@ -859,8 +1038,7 @@ mod tests {
     use tokio::net::TcpListener;
     use tokio_util::sync::CancellationToken;
 
-    #[tokio::test]
-    async fn api_state_and_toggle_smoke() {
+    async fn make_test_state() -> (PathBuf, CancellationToken, Arc<AskpassStore>, u16) {
         let tmp = std::env::temp_dir().join(format!("uutunnels_test_{}.json", Uuid::new_v4()));
         let cfg = AppConfig::preset();
         config::save(&tmp, &cfg).unwrap();
@@ -868,11 +1046,13 @@ mod tests {
         let root = CancellationToken::new();
         let ssh = Arc::new(SshEngine::new(root.clone()));
         let fwd = Arc::new(ForwarderManager::new(ssh.clone(), root.clone()));
+        let askpass = Arc::new(AskpassStore::new());
         let state = AppState {
             config_path: tmp.clone(),
             config: Arc::new(RwLock::new(cfg)),
             ssh,
             forwarder: fwd,
+            askpass: askpass.clone(),
             ui_boot_id: "boot-test-1".to_string(),
             ui_reload_seq: Arc::new(AtomicU64::new(0)),
         };
@@ -883,6 +1063,12 @@ mod tests {
         tokio::spawn(async move {
             axum::serve(listener, app).await.unwrap();
         });
+        (tmp, root, askpass, port)
+    }
+
+    #[tokio::test]
+    async fn api_state_and_toggle_smoke() {
+        let (tmp, root, _askpass, port) = make_test_state().await;
 
         let mut s = tokio::net::TcpStream::connect(("127.0.0.1", port))
             .await
@@ -896,6 +1082,8 @@ mod tests {
         assert!(buf.contains("linux-host"));
         assert!(buf.contains("lan-nas"));
         assert!(buf.contains("auto_hide_uu"));
+        assert!(buf.contains("ssh_terminal"));
+        assert!(buf.contains("effective_ssh_username"));
         assert!(buf.contains("rx_bps"));
         assert!(buf.contains("pinned"));
         assert!(buf.contains("url_path"));
@@ -925,28 +1113,7 @@ mod tests {
 
     #[tokio::test]
     async fn api_rule_url_path_create_and_update() {
-        let tmp = std::env::temp_dir().join(format!("uutunnels_test_{}.json", Uuid::new_v4()));
-        let cfg = AppConfig::preset();
-        config::save(&tmp, &cfg).unwrap();
-
-        let root = CancellationToken::new();
-        let ssh = Arc::new(SshEngine::new(root.clone()));
-        let fwd = Arc::new(ForwarderManager::new(ssh.clone(), root.clone()));
-        let state = AppState {
-            config_path: tmp.clone(),
-            config: Arc::new(RwLock::new(cfg)),
-            ssh,
-            forwarder: fwd,
-            ui_boot_id: "boot-test-1".to_string(),
-            ui_reload_seq: Arc::new(AtomicU64::new(0)),
-        };
-        let app = build_router(state);
-
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let port = listener.local_addr().unwrap().port();
-        tokio::spawn(async move {
-            axum::serve(listener, app).await.unwrap();
-        });
+        let (tmp, root, _askpass, port) = make_test_state().await;
 
         let update_body = serde_json::json!({
             "machine_id": "linux-host",
@@ -1012,6 +1179,163 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn api_ssh_rule_credentials_and_masking() {
+        let (tmp, root, _askpass, port) = make_test_state().await;
+
+        let create_body = serde_json::json!({
+            "machine_id": "lan-nas",
+            "name": "NAS Admin SSH",
+            "protocol": "ssh",
+            "local_host": "127.0.0.1",
+            "local_port": 2298,
+            "target_host": "192.168.1.100",
+            "target_port": 22,
+            "ssh_username": "nasadmin",
+            "ssh_auth_type": "password",
+            "ssh_password": "secret-nas-password",
+            "enabled": false,
+            "pinned": false
+        })
+        .to_string();
+        let resp = send_http_json(port, "POST", "/api/rules", &create_body).await;
+        assert!(resp.contains("200 OK"));
+        assert!(resp.contains("\"ssh_username\":\"nasadmin\""));
+        assert!(resp.contains("\"ssh_has_password\":true"));
+        assert!(resp.contains("\"effective_ssh_username\":\"nasadmin\""));
+        assert!(!resp.contains("secret-nas-password"));
+
+        let saved = config::load_or_create(&tmp).unwrap();
+        let created = saved.rules.iter().find(|r| r.name == "NAS Admin SSH").unwrap();
+        assert_eq!(created.ssh_password.as_deref(), Some("secret-nas-password"));
+        let rule_id = created.id.clone();
+
+        // Empty password on PUT preserves existing password
+        let preserve_body = serde_json::json!({
+            "machine_id": "lan-nas",
+            "name": "NAS Admin SSH",
+            "protocol": "ssh",
+            "local_host": "127.0.0.1",
+            "local_port": 2298,
+            "target_host": "192.168.1.100",
+            "target_port": 22,
+            "ssh_username": "nasadmin2",
+            "ssh_auth_type": "password",
+            "ssh_password": "",
+            "enabled": false,
+            "pinned": false
+        })
+        .to_string();
+        let resp2 = send_http_json(port, "PUT", &format!("/api/rules/{rule_id}"), &preserve_body).await;
+        assert!(resp2.contains("200 OK"));
+        assert!(resp2.contains("\"ssh_has_password\":true"));
+        let saved2 = config::load_or_create(&tmp).unwrap();
+        let r2 = saved2.rules.iter().find(|r| r.id == rule_id).unwrap();
+        assert_eq!(r2.ssh_username.as_deref(), Some("nasadmin2"));
+        assert_eq!(r2.ssh_password.as_deref(), Some("secret-nas-password"));
+
+        // Explicit clear removes password
+        let clear_body = serde_json::json!({
+            "machine_id": "lan-nas",
+            "name": "NAS Admin SSH",
+            "protocol": "ssh",
+            "local_host": "127.0.0.1",
+            "local_port": 2298,
+            "target_host": "192.168.1.100",
+            "target_port": 22,
+            "ssh_username": "nasadmin2",
+            "ssh_auth_type": "private_key",
+            "clear_ssh_password": true,
+            "ssh_key_path": "~/.ssh/id_ed25519",
+            "ssh_key_passphrase": "key-pp",
+            "enabled": false,
+            "pinned": false
+        })
+        .to_string();
+        let resp3 = send_http_json(port, "PUT", &format!("/api/rules/{rule_id}"), &clear_body).await;
+        assert!(resp3.contains("200 OK"));
+        assert!(resp3.contains("\"ssh_has_password\":false"));
+        assert!(resp3.contains("\"ssh_has_key_passphrase\":true"));
+        assert!(!resp3.contains("key-pp"));
+
+        // Switching protocol away from ssh clears all ssh_* fields
+        let tcp_body = serde_json::json!({
+            "machine_id": "lan-nas",
+            "name": "NAS TCP",
+            "protocol": "tcp",
+            "local_host": "127.0.0.1",
+            "local_port": 2298,
+            "target_host": "192.168.1.100",
+            "target_port": 22,
+            "enabled": false,
+            "pinned": false
+        })
+        .to_string();
+        let resp4 = send_http_json(port, "PUT", &format!("/api/rules/{rule_id}"), &tcp_body).await;
+        assert!(resp4.contains("200 OK"));
+        let saved4 = config::load_or_create(&tmp).unwrap();
+        let r4 = saved4.rules.iter().find(|r| r.id == rule_id).unwrap();
+        assert!(r4.ssh_username.is_none());
+        assert!(r4.ssh_auth_type.is_none());
+        assert!(r4.ssh_password.is_none());
+        assert!(r4.ssh_key_path.is_none());
+        assert!(r4.ssh_key_passphrase.is_none());
+
+        root.cancel();
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[tokio::test]
+    async fn api_ssh_terminals_and_askpass_endpoints() {
+        let (tmp, root, askpass, port) = make_test_state().await;
+
+        let list_resp = send_http_json(port, "GET", "/api/ssh-terminals", "").await;
+        assert!(list_resp.contains("200 OK"));
+        assert!(list_resp.contains("\"powershell\""));
+        assert!(list_resp.contains("\"xshell\""));
+
+        let bad_kind = send_http_json(
+            port,
+            "POST",
+            "/api/settings/ssh-terminal",
+            r#"{"kind":"unknown_term"}"#,
+        )
+        .await;
+        assert!(bad_kind.contains("400 Bad Request"));
+
+        let missing_custom = send_http_json(
+            port,
+            "POST",
+            "/api/settings/ssh-terminal",
+            r#"{"kind":"custom","custom_path":"","custom_args":"{host}"}"#,
+        )
+        .await;
+        assert!(missing_custom.contains("400 Bad Request"));
+
+        let ok_save = send_http_json(
+            port,
+            "POST",
+            "/api/settings/ssh-terminal",
+            r#"{"kind":"pwsh","custom_path":"","custom_args":""}"#,
+        )
+        .await;
+        assert!(ok_save.contains("200 OK"));
+        assert!(ok_save.contains("\"kind\":\"pwsh\""));
+        let saved = config::load_or_create(&tmp).unwrap();
+        assert_eq!(saved.ssh_terminal.kind, "pwsh");
+
+        let tok = askpass.mint("my-pass-123".to_string());
+        let first = send_http_json(port, "POST", &format!("/api/internal/askpass/{tok}"), "").await;
+        assert!(first.contains("200 OK"));
+        assert!(first.ends_with("my-pass-123"));
+
+        let second = send_http_json(port, "POST", &format!("/api/internal/askpass/{tok}"), "").await;
+        assert!(second.contains("404 Not Found"));
+
+        root.cancel();
+        let _ = std::fs::remove_file(&tmp);
+    }
+
+    #[tokio::test]
     async fn api_ui_signal_tracks_reload_seq() {
         let tmp = std::env::temp_dir().join(format!("uutunnels_test_{}.json", Uuid::new_v4()));
         let cfg = AppConfig::preset();
@@ -1026,6 +1350,7 @@ mod tests {
             config: Arc::new(RwLock::new(cfg)),
             ssh,
             forwarder: fwd,
+            askpass: Arc::new(AskpassStore::new()),
             ui_boot_id: "boot-xyz".to_string(),
             ui_reload_seq: reload_seq.clone(),
         };

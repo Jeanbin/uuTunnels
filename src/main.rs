@@ -6,6 +6,7 @@ mod browser_tab;
 mod config;
 mod forwarder;
 mod ssh_engine;
+mod ssh_terminal;
 mod tray;
 mod uu_window;
 
@@ -90,6 +91,10 @@ fn request_running_instance_open(ui_port: u16) -> bool {
 }
 
 fn main() {
+    if let Some(code) = ssh_terminal::try_run_askpass_mode() {
+        std::process::exit(code);
+    }
+
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -128,6 +133,7 @@ fn main() {
             config: Arc::new(RwLock::new(cfg.clone())),
             ssh: ssh.clone(),
             forwarder: forwarder.clone(),
+            askpass: Arc::new(ssh_terminal::AskpassStore::new()),
             ui_boot_id: Uuid::new_v4().to_string(),
             ui_reload_seq: Arc::new(AtomicU64::new(0)),
         };

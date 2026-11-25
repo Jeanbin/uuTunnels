@@ -573,6 +573,9 @@
     white-space: nowrap;
     flex: 0 1 auto;
   }
+  .addr-user {
+    color: var(--warn);
+  }
   .addr-path {
     color: var(--cyan);
   }
@@ -882,9 +885,15 @@
   }
   .modal-box {
     width: 100%;
-    max-width: 520px;
+    max-width: 540px;
+    max-height: calc(100vh - 32px);
+    display: flex;
+    flex-direction: column;
     border: 1px solid var(--accent-border);
     background: var(--panel);
+  }
+  .modal-box-wide {
+    max-width: 660px;
   }
   .modal-head {
     display: flex;
@@ -895,12 +904,151 @@
     border-bottom: 1px solid var(--border);
     font-weight: 700;
     color: #ffffff;
+    flex-shrink: 0;
   }
   .modal-body {
     padding: 12px;
     display: flex;
     flex-direction: column;
     gap: 10px;
+    overflow-y: auto;
+    min-height: 0;
+  }
+  .form-subbox {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .form-inline-check {
+    align-self: flex-start;
+    margin-top: 2px;
+    font-size: 11px;
+    padding: 1px 6px;
+  }
+
+  /* Quick Terminal Picker Popup */
+  .tui-popup {
+    position: fixed;
+    min-width: 228px;
+    max-width: 310px;
+    background: var(--panel);
+    border: 1px solid var(--accent-border);
+    z-index: 1500;
+    display: none;
+    flex-direction: column;
+    padding: 4px;
+    gap: 2px;
+  }
+  .tui-popup.open {
+    display: flex;
+  }
+  .tui-popup-head {
+    color: var(--text-dim);
+    font-size: 11px;
+    padding: 2px 6px 4px;
+    border-bottom: 1px dashed var(--border);
+    margin-bottom: 2px;
+  }
+  .tui-popup-item {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    padding: 4px 6px;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    width: 100%;
+  }
+  .tui-popup-item:hover {
+    background: var(--panel-hover);
+    border-color: var(--border-bright);
+    color: #ffffff;
+  }
+  .tui-popup-item.default {
+    color: var(--accent);
+  }
+  .tui-popup-sep {
+    border-top: 1px dashed var(--border);
+    margin: 2px 0;
+  }
+
+  /* Terminal Settings List */
+  .term-option-list {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    max-height: 270px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-bright) var(--bg);
+  }
+  .term-option {
+    border: 1px solid var(--border);
+    background: var(--bg);
+    padding: 6px 8px;
+    cursor: pointer;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    text-align: left;
+    width: 100%;
+  }
+  .term-option:hover {
+    border-color: var(--border-bright);
+    background: var(--panel-hover);
+  }
+  .term-option.selected {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+  }
+  .term-option-top {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+  }
+  .term-option-name {
+    font-weight: 700;
+    color: #ffffff;
+  }
+  .term-option-tags {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .term-tag {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text-dim);
+    padding: 0 4px;
+    font-size: 10.5px;
+    white-space: pre;
+  }
+  .term-tag.ok {
+    color: var(--accent);
+    border-color: var(--accent-border);
+    background: var(--accent-dim);
+  }
+  .term-tag.miss {
+    color: var(--text-muted);
+  }
+  .term-option-path {
+    color: var(--cyan);
+    font-size: 11px;
+    word-break: break-all;
+  }
+  .term-option-note {
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.35;
   }
   .form-row {
     display: flex;
@@ -1030,6 +1178,7 @@
       <button class="tui-btn tui-btn-muted" onclick="batchRules('disable_all')">[ 全部关闭 ]</button>
       <span class="toolbar-sep">|</span>
       <button id="btn-autostart" class="tui-check" onclick="toggleAutostart()">[ ] 开机自启</button>
+      <button id="btn-ssh-terminal" class="tui-btn tui-btn-muted" onclick="openTerminalModal()">[ &gt;_ SSH终端: 自动 ]</button>
       <button class="tui-btn tui-btn-muted" onclick="openConfigDir()">[ 配置目录 ]</button>
       <button class="tui-btn tui-btn-muted" onclick="toggleGuideSection()">[ ? 说明 ]</button>
     </div>
@@ -1325,6 +1474,38 @@
         <input id="r-urlpath" class="form-input" autocomplete="off" placeholder="如：/43235a23 或 43235a23（留空直接访问根路径）" oninput="updateRuleUrlPreview()" />
         <div id="r-urlpath-preview" class="form-hint"></div>
       </div>
+      <div id="r-ssh-section" class="form-subbox" style="display:none;">
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label class="form-label">SSH 用户名 <span class="form-hint">(可选)</span></label>
+            <input id="r-ssh-user" name="rule_ssh_username" class="form-input" autocomplete="off" placeholder="留空：127.0.0.1 回退基座用户" oninput="updateRuleSshPreview()" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">SSH 认证方式</label>
+            <select id="r-ssh-auth" class="form-select" onchange="onRuleSshAuthChange()">
+              <option value="password">密码认证</option>
+              <option value="private_key">私钥文件认证</option>
+            </select>
+          </div>
+        </div>
+        <div id="r-ssh-pwd-row" class="form-row">
+          <label class="form-label">SSH 密码 <span id="r-ssh-pwd-hint" class="form-hint"></span></label>
+          <input id="r-ssh-pwd" name="rule_ssh_password" class="form-input" type="password" autocomplete="new-password" placeholder="可选；留空则在终端手动输入" oninput="updateRuleSshPreview()" />
+          <button type="button" id="r-ssh-clear-pwd-btn" class="tui-check form-inline-check" style="display:none;" onclick="toggleClearRulePwd()">[ ] 清除已存密码</button>
+        </div>
+        <div id="r-ssh-key-rows" style="display:none;">
+          <div class="form-row" style="margin-bottom:8px;">
+            <label class="form-label">私钥路径</label>
+            <input id="r-ssh-keypath" class="form-input" autocomplete="off" placeholder="如：~/.ssh/id_ed25519 或 C:\Users\...\id_rsa" oninput="updateRuleSshPreview()" />
+          </div>
+          <div class="form-row">
+            <label class="form-label">私钥口令 <span id="r-ssh-keypp-hint" class="form-hint"></span></label>
+            <input id="r-ssh-keypp" name="rule_ssh_passphrase" class="form-input" type="password" autocomplete="new-password" placeholder="无口令或留空表示不修改" oninput="updateRuleSshPreview()" />
+            <button type="button" id="r-ssh-clear-keypp-btn" class="tui-check form-inline-check" style="display:none;" onclick="toggleClearRuleKeypp()">[ ] 清除已存口令</button>
+          </div>
+        </div>
+        <div id="r-ssh-preview" class="form-hint"></div>
+      </div>
       <div class="modal-foot" style="margin:-12px; margin-top:4px;">
         <button type="button" class="tui-btn tui-btn-muted" onclick="closeModal('modal-rule')">[ 取消 ]</button>
         <button type="submit" class="tui-btn tui-btn-primary">[ 保存 ]</button>
@@ -1332,6 +1513,39 @@
     </form>
   </div>
 </div>
+
+<!-- Modal: SSH Terminal Settings -->
+<div id="modal-terminal" class="modal-backdrop">
+  <div class="modal-box modal-box-wide">
+    <div class="modal-head">
+      <span>[+] SSH 终端工具设置</span>
+      <button class="tui-btn tui-btn-sm tui-btn-muted" onclick="closeModal('modal-terminal')">[ x ]</button>
+    </div>
+    <form class="modal-body" autocomplete="off" onsubmit="event.preventDefault(); saveTerminalSettings();">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <span class="form-hint">选择点击 [ &gt;_终端 ] 时使用的 SSH 工具（常规 SSH 客户端或控制台）</span>
+        <button type="button" class="tui-btn tui-btn-sm tui-btn-muted" onclick="loadSshTerminals(true)">[ 刷新检测 ]</button>
+      </div>
+      <div id="t-option-list" class="term-option-list"></div>
+      <div id="t-path-row" class="form-row" style="display:none;">
+        <label id="t-path-label" class="form-label">可执行文件路径</label>
+        <input id="t-custom-path" class="form-input" autocomplete="off" placeholder="如：D:\Tools\PuTTY\putty.exe" />
+      </div>
+      <div id="t-args-row" class="form-row" style="display:none;">
+        <label class="form-label">自定义参数模板</label>
+        <input id="t-custom-args" class="form-input" autocomplete="off" placeholder="-p {port} {target}" />
+        <div class="form-hint">可用占位符: {host} {port} {user} {target} {password} {key_path} {key_passphrase} {name} {ssh_url} {ssh_url_auth}</div>
+      </div>
+      <div class="modal-foot" style="margin:-12px; margin-top:4px;">
+        <button type="button" class="tui-btn tui-btn-muted" onclick="closeModal('modal-terminal')">[ 取消 ]</button>
+        <button type="submit" class="tui-btn tui-btn-primary">[ 保存设置 ]</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Top-level quick SSH terminal picker popup (outside polling DOM) -->
+<div id="ssh-term-menu" class="tui-popup" role="menu"></div>
 
 <div id="toast" class="toast"></div>
 
@@ -1343,6 +1557,7 @@ let state = {
   uu_windows: [],
   autostart: false,
   auto_hide_uu: false,
+  ssh_terminal: { kind: 'auto', custom_path: '', custom_args: '' },
   config_path: '',
   ui_port: 17890,
   ui_boot_id: '',
@@ -1353,6 +1568,11 @@ let toastTimer = null;
 let knownBootId = null;
 let knownReloadSeq = null;
 let isReloadingPage = false;
+let terminalCatalogCache = null;
+let selectedTermKind = 'auto';
+let activeSshMenuRuleId = null;
+let clearRuleSshPwd = false;
+let clearRuleSshKeypp = false;
 const ruleSpeedCache = {};
 
 function esc(s) {
@@ -1560,6 +1780,12 @@ function render() {
   btnAutoHide.textContent = (state.auto_hide_uu ? '[x] 基座连上自动收纳' : '[ ] 基座连上自动收纳');
   btnAutoHide.className = 'tui-check' + (state.auto_hide_uu ? ' on' : '');
 
+  const btnSshTerm = document.getElementById('btn-ssh-terminal');
+  if (btnSshTerm) {
+    const tKind = (state.ssh_terminal && state.ssh_terminal.kind) || 'auto';
+    btnSshTerm.textContent = '[ >_ SSH终端: ' + termShortLabel(tKind) + ' ]';
+  }
+
   const qInput = document.getElementById('filter-query');
   const q = (qInput.value || '').trim().toLowerCase();
   document.getElementById('btn-clear-filter').style.display = q ? 'inline-flex' : 'none';
@@ -1619,6 +1845,8 @@ function render() {
           String(r.target_port).includes(q) ||
           (r.target_host || '').toLowerCase().includes(q) ||
           (r.url_path || '').toLowerCase().includes(q) ||
+          (r.ssh_username || '').toLowerCase().includes(q) ||
+          (r.effective_ssh_username || '').toLowerCase().includes(q) ||
           (m.name || '').toLowerCase().includes(q)
         );
       }
@@ -1633,7 +1861,13 @@ function render() {
             const laddr = esc(lhost) + ':' + r.local_port;
             const urlPath = (p === 'http' || p === 'https') ? normalizeUrlPath(r.url_path) : '';
             const fullWebUrl = (p === 'http' || p === 'https') ? buildWebUrl(p, lhost, r.local_port, urlPath) : (lhost + ':' + r.local_port);
-            const laddrHtml = '<span class="addr-text" title="' + esc(fullWebUrl) + '">' + laddr + (urlPath ? '<span class="addr-path">' + esc(urlPath) + '</span>' : '') + '</span>';
+            const effUser = (p === 'ssh' && r.effective_ssh_username) ? r.effective_ssh_username : '';
+            const addrTitle = p === 'ssh'
+              ? ((effUser ? effUser + '@' : '') + lhost + ':' + r.local_port)
+              : fullWebUrl;
+            const laddrHtml = p === 'ssh'
+              ? '<span class="addr-text" title="' + esc(addrTitle) + '">' + (effUser ? '<span class="addr-user">' + esc(effUser) + '@</span>' : '') + laddr + '</span>'
+              : '<span class="addr-text" title="' + esc(addrTitle) + '">' + laddr + (urlPath ? '<span class="addr-path">' + esc(urlPath) + '</span>' : '') + '</span>';
             const taddr = esc(r.target_host) + ':' + r.target_port;
             const rt = r.runtime || {};
             const cachedSpeed = ruleSpeedCache[r.id];
@@ -1656,6 +1890,7 @@ function render() {
               addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-muted" onclick="copyRuleAddr(\'' + esc(r.id) + '\')">[复制SSH]</button>';
               if (rt.status === 'running') {
                 addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-accent" onclick="openSshTerm(\'' + esc(r.id) + '\')">[&gt;_终端]</button>';
+                addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-accent" title="选择 SSH 终端打开" onclick="openSshTermMenu(event,\'' + esc(r.id) + '\')">[▾]</button>';
               }
             } else {
               addrBtns += '<button class="tui-btn tui-btn-sm tui-btn-muted" title="' + esc(fullWebUrl) + '" onclick="copyRuleAddr(\'' + esc(r.id) + '\')">[复制]</button>';
@@ -1810,11 +2045,99 @@ async function probeRule(id) {
   } catch (e) { showToast(e.message, true); }
 }
 
-async function openSshTerm(id) {
+async function openSshTerm(id, terminalKind) {
+  closeSshTermMenu();
   try {
-    const res = await api('/api/rules/' + encodeURIComponent(id) + '/open-ssh', { method: 'POST' });
-    showToast('已启动终端: ' + (res.command || ''));
+    const body = terminalKind ? JSON.stringify({ terminal_kind: terminalKind }) : '{}';
+    const res = await api('/api/rules/' + encodeURIComponent(id) + '/open-ssh', {
+      method: 'POST',
+      body
+    });
+    showToast('已启动 ' + (res.terminal_name || '终端') + ': ' + (res.command || ''));
   } catch (e) { showToast(e.message, true); }
+}
+
+function termShortLabel(kind) {
+  const map = {
+    auto: '自动',
+    xshell: 'Xshell',
+    mobaxterm: 'MobaXterm',
+    putty: 'PuTTY',
+    kitty: 'KiTTY',
+    securecrt: 'SecureCRT',
+    electerm: 'Electerm',
+    wt: 'WT',
+    pwsh: 'PWSH7',
+    powershell: 'PowerShell',
+    cmd: 'CMD',
+    git_bash: 'Git Bash',
+    ssh_uri: 'ssh://',
+    custom: '自定义'
+  };
+  return map[kind] || kind || '自动';
+}
+
+function closeSshTermMenu() {
+  const menu = document.getElementById('ssh-term-menu');
+  if (menu) menu.classList.remove('open');
+  activeSshMenuRuleId = null;
+}
+
+async function openSshTermMenu(ev, ruleId) {
+  if (ev) ev.stopPropagation();
+  const menu = document.getElementById('ssh-term-menu');
+  if (!menu) return;
+  if (menu.classList.contains('open') && activeSshMenuRuleId === ruleId) {
+    closeSshTermMenu();
+    return;
+  }
+  activeSshMenuRuleId = ruleId;
+  const anchorRect = ev && ev.currentTarget ? ev.currentTarget.getBoundingClientRect() : null;
+
+  if (!terminalCatalogCache) {
+    await loadSshTerminals(false);
+  }
+  if (activeSshMenuRuleId !== ruleId) return;
+
+  const defKind = (state.ssh_terminal && state.ssh_terminal.kind) || 'auto';
+  const hasCustom = Boolean(state.ssh_terminal && state.ssh_terminal.custom_path && state.ssh_terminal.custom_path.trim());
+  const list = (terminalCatalogCache || []).filter(t =>
+    t.id !== 'auto' && t.detected && (t.id !== 'custom' || hasCustom)
+  );
+
+  let html = '<div class="tui-popup-head">选择本次打开的 SSH 工具</div>';
+  html += '<button type="button" class="tui-popup-item default" onclick="openSshTerm(\'' + esc(ruleId) + '\')">' +
+    '<span>★ 使用默认 (' + esc(termShortLabel(defKind)) + ')</span><span>↵</span>' +
+  '</button>';
+  if (list.length > 0) {
+    html += '<div class="tui-popup-sep"></div>';
+    html += list.map(t => {
+      const isDef = t.id === defKind;
+      return '<button type="button" class="tui-popup-item' + (isDef ? ' default' : '') + '" onclick="openSshTerm(\'' + esc(ruleId) + '\',\'' + esc(t.id) + '\')">' +
+        '<span>' + esc(t.name) + '</span>' +
+        '<span class="form-hint">' + (isDef ? '默认' : '') + '</span>' +
+      '</button>';
+    }).join('');
+  }
+  html += '<div class="tui-popup-sep"></div>';
+  html += '<button type="button" class="tui-popup-item" onclick="closeSshTermMenu(); openTerminalModal();">' +
+    '<span>[ ⚙ 配置默认终端... ]</span><span></span>' +
+  '</button>';
+  menu.innerHTML = html;
+  menu.classList.add('open');
+
+  if (anchorRect) {
+    const mw = menu.offsetWidth || 240;
+    const mh = menu.offsetHeight || 220;
+    let left = Math.min(anchorRect.left, window.innerWidth - mw - 10);
+    left = Math.max(8, left);
+    let top = anchorRect.bottom + 4;
+    if (top + mh > window.innerHeight - 10) {
+      top = Math.max(8, anchorRect.top - mh - 4);
+    }
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+  }
 }
 
 function normalizeUrlPath(raw) {
@@ -1843,7 +2166,16 @@ function copyRuleAddr(id) {
   const p = String(r.protocol || 'tcp').toLowerCase();
   const lhost = (r.local_host || '127.0.0.1').trim() || '127.0.0.1';
   if (p === 'ssh') {
-    copyText('ssh root@' + lhost + ' -p ' + r.local_port, '已复制 SSH 命令');
+    const effUser = (r.effective_ssh_username || '').trim();
+    const target = (effUser ? effUser + '@' : '') + lhost;
+    const parts = ['ssh'];
+    if (r.ssh_auth_type === 'private_key' && r.ssh_key_path) {
+      const kp = r.ssh_key_path.trim();
+      const qkp = /\s/.test(kp) ? ('"' + kp + '"') : kp;
+      parts.push('-i', qkp);
+    }
+    parts.push(target, '-p', String(r.local_port));
+    copyText(parts.join(' '), '已复制 SSH 命令');
   } else if (p === 'http' || p === 'https') {
     copyText(buildWebUrl(p, lhost, r.local_port, r.url_path), '已复制地址');
   } else {
@@ -2068,7 +2400,45 @@ function onRuleProtoChange() {
   const row = document.getElementById('r-urlpath-row');
   const isWeb = (proto === 'http' || proto === 'https');
   row.style.display = isWeb ? 'flex' : 'none';
+  const sshSection = document.getElementById('r-ssh-section');
+  if (sshSection) {
+    sshSection.style.display = proto === 'ssh' ? 'flex' : 'none';
+  }
   updateRuleUrlPreview();
+  updateRuleSshPreview();
+}
+
+function onRuleSshAuthChange() {
+  const auth = document.getElementById('r-ssh-auth').value;
+  document.getElementById('r-ssh-pwd-row').style.display = auth === 'password' ? 'flex' : 'none';
+  document.getElementById('r-ssh-key-rows').style.display = auth === 'private_key' ? 'block' : 'none';
+  updateRuleSshPreview();
+}
+
+function toggleClearRulePwd() {
+  clearRuleSshPwd = !clearRuleSshPwd;
+  const btn = document.getElementById('r-ssh-clear-pwd-btn');
+  if (btn) {
+    btn.textContent = clearRuleSshPwd ? '[x] 将清除已存密码' : '[ ] 清除已存密码';
+    btn.className = 'tui-check form-inline-check' + (clearRuleSshPwd ? ' on' : '');
+  }
+  if (clearRuleSshPwd) {
+    document.getElementById('r-ssh-pwd').value = '';
+  }
+  updateRuleSshPreview();
+}
+
+function toggleClearRuleKeypp() {
+  clearRuleSshKeypp = !clearRuleSshKeypp;
+  const btn = document.getElementById('r-ssh-clear-keypp-btn');
+  if (btn) {
+    btn.textContent = clearRuleSshKeypp ? '[x] 将清除已存口令' : '[ ] 清除已存口令';
+    btn.className = 'tui-check form-inline-check' + (clearRuleSshKeypp ? ' on' : '');
+  }
+  if (clearRuleSshKeypp) {
+    document.getElementById('r-ssh-keypp').value = '';
+  }
+  updateRuleSshPreview();
 }
 
 function updateRuleUrlPreview() {
@@ -2084,6 +2454,69 @@ function updateRuleUrlPreview() {
   el.textContent = '完整访问地址: ' + proto + '://' + lhost + ':' + lport + suffix;
 }
 
+function updateRuleSshPreview() {
+  const el = document.getElementById('r-ssh-preview');
+  if (!el) return;
+  const proto = document.getElementById('r-proto').value;
+  if (proto !== 'ssh') {
+    el.textContent = '';
+    return;
+  }
+  const ruleId = document.getElementById('r-id').value.trim();
+  const existing = ruleId ? (state.rules || []).find(x => x.id === ruleId) : null;
+  const machineId = document.getElementById('r-machine').value;
+  const lhost = document.getElementById('r-lhost').value.trim() || '127.0.0.1';
+  const lport = document.getElementById('r-lport').value.trim() || '<端口>';
+  const thost = document.getElementById('r-thost').value.trim();
+  let effUser = document.getElementById('r-ssh-user').value.trim();
+  let fallbackNote = '';
+  if (!effUser && (thost === '127.0.0.1' || thost.toLowerCase() === 'localhost')) {
+    const m = (state.machines || []).find(x => x.id === machineId);
+    const b = m ? (state.bases || []).find(x => x.id === m.base_id) : null;
+    if (b && b.kind === 'ssh' && b.username) {
+      effUser = b.username;
+      fallbackNote = ' [沿用基座用户]';
+    }
+  }
+  const auth = document.getElementById('r-ssh-auth').value;
+  const keyPath = document.getElementById('r-ssh-keypath').value.trim();
+  const newPwd = document.getElementById('r-ssh-pwd').value;
+  if (newPwd && clearRuleSshPwd) {
+    clearRuleSshPwd = false;
+    const btn = document.getElementById('r-ssh-clear-pwd-btn');
+    if (btn) {
+      btn.textContent = '[ ] 清除已存密码';
+      btn.className = 'tui-check form-inline-check';
+    }
+  }
+  const newKeypp = document.getElementById('r-ssh-keypp').value;
+  if (newKeypp && clearRuleSshKeypp) {
+    clearRuleSshKeypp = false;
+    const btn = document.getElementById('r-ssh-clear-keypp-btn');
+    if (btn) {
+      btn.textContent = '[ ] 清除已存口令';
+      btn.className = 'tui-check form-inline-check';
+    }
+  }
+
+  const target = (effUser ? effUser + '@' : '') + lhost;
+  let authDesc = '';
+  let cmd = 'ssh ';
+  if (auth === 'private_key') {
+    if (keyPath) {
+      cmd += '-i "' + keyPath + '" ';
+      authDesc = '私钥认证';
+    } else {
+      authDesc = '私钥认证 (未填路径)';
+    }
+  } else {
+    const hasPwd = Boolean(newPwd) || (Boolean(existing && existing.ssh_has_password) && !clearRuleSshPwd);
+    authDesc = hasPwd ? '已配置密码' : '终端手动输入密码';
+  }
+  cmd += target + ' -p ' + lport;
+  el.textContent = '连接预览: ' + cmd + ' · ' + authDesc + fallbackNote;
+}
+
 function openRuleModal(machineId, ruleId) {
   const m = (state.machines || []).find(x => x.id === machineId);
   const r = ruleId ? (state.rules || []).find(x => x.id === ruleId) : null;
@@ -2097,6 +2530,32 @@ function openRuleModal(machineId, ruleId) {
   document.getElementById('r-thost').value = r ? r.target_host : (m ? m.default_target_host : '127.0.0.1');
   document.getElementById('r-tport').value = r ? r.target_port : '';
   document.getElementById('r-urlpath').value = r ? (r.url_path || '') : '';
+
+  clearRuleSshPwd = false;
+  clearRuleSshKeypp = false;
+  document.getElementById('r-ssh-user').value = r ? (r.ssh_username || '') : '';
+  const defaultAuth = (r && r.ssh_auth_type)
+    ? r.ssh_auth_type
+    : (r && r.ssh_key_path ? 'private_key' : 'password');
+  document.getElementById('r-ssh-auth').value = defaultAuth;
+  document.getElementById('r-ssh-pwd').value = '';
+  const hasSavedPwd = Boolean(r && r.ssh_has_password);
+  document.getElementById('r-ssh-pwd-hint').textContent = hasSavedPwd ? '(已保存密码，留空保持不变)' : '';
+  const clearPwdBtn = document.getElementById('r-ssh-clear-pwd-btn');
+  clearPwdBtn.style.display = hasSavedPwd ? 'inline-flex' : 'none';
+  clearPwdBtn.textContent = '[ ] 清除已存密码';
+  clearPwdBtn.className = 'tui-check form-inline-check';
+
+  document.getElementById('r-ssh-keypath').value = r ? (r.ssh_key_path || '') : '';
+  document.getElementById('r-ssh-keypp').value = '';
+  const hasSavedKeypp = Boolean(r && r.ssh_has_key_passphrase);
+  document.getElementById('r-ssh-keypp-hint').textContent = hasSavedKeypp ? '(已保存口令，留空保持不变)' : '';
+  const clearKeyppBtn = document.getElementById('r-ssh-clear-keypp-btn');
+  clearKeyppBtn.style.display = hasSavedKeypp ? 'inline-flex' : 'none';
+  clearKeyppBtn.textContent = '[ ] 清除已存口令';
+  clearKeyppBtn.className = 'tui-check form-inline-check';
+
+  onRuleSshAuthChange();
   onRuleProtoChange();
   document.getElementById('modal-rule').classList.add('open');
 }
@@ -2120,6 +2579,20 @@ async function saveRule() {
     enabled: existing ? Boolean(existing.enabled) : true,
     pinned: existing ? Boolean(existing.pinned) : false
   };
+  if (proto === 'ssh') {
+    const sshUser = document.getElementById('r-ssh-user').value.trim();
+    const sshAuth = document.getElementById('r-ssh-auth').value;
+    const sshPwd = document.getElementById('r-ssh-pwd').value;
+    const sshKeyPath = document.getElementById('r-ssh-keypath').value.trim();
+    const sshKeypp = document.getElementById('r-ssh-keypp').value;
+    payload.ssh_username = sshUser || null;
+    payload.ssh_auth_type = sshAuth;
+    payload.ssh_password = sshPwd ? sshPwd : null;
+    payload.clear_ssh_password = Boolean(clearRuleSshPwd && !sshPwd);
+    payload.ssh_key_path = sshKeyPath || null;
+    payload.ssh_key_passphrase = sshKeypp ? sshKeypp : null;
+    payload.clear_ssh_key_passphrase = Boolean(clearRuleSshKeypp && !sshKeypp);
+  }
   try {
     if (id) {
       await api('/api/rules/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify(payload) });
@@ -2130,6 +2603,108 @@ async function saveRule() {
     }
     closeModal('modal-rule');
     await refreshState();
+  } catch (e) { showToast(e.message, true); }
+}
+
+async function loadSshTerminals(renderModal) {
+  try {
+    const res = await api('/api/ssh-terminals', { cache: 'no-store' });
+    terminalCatalogCache = res.terminals || [];
+    if (res.selected) {
+      state.ssh_terminal = res.selected;
+    }
+    if (renderModal) {
+      renderTerminalOptions();
+    }
+  } catch (e) {
+    if (renderModal) showToast(e.message, true);
+  }
+}
+
+function openTerminalModal() {
+  closeSshTermMenu();
+  const cfg = state.ssh_terminal || { kind: 'auto', custom_path: '', custom_args: '' };
+  selectedTermKind = cfg.kind || 'auto';
+  document.getElementById('t-custom-path').value = cfg.custom_path || '';
+  document.getElementById('t-custom-args').value = cfg.custom_args || '';
+  renderTerminalOptions();
+  updateTermExtraFields();
+  document.getElementById('modal-terminal').classList.add('open');
+  loadSshTerminals(true);
+}
+
+function renderTerminalOptions() {
+  const listEl = document.getElementById('t-option-list');
+  if (!listEl) return;
+  const items = terminalCatalogCache || [];
+  if (items.length === 0) {
+    listEl.innerHTML = '<div class="empty-line">&gt; 正在检测本地 SSH 终端工具...</div>';
+    return;
+  }
+  listEl.innerHTML = items.map(t => {
+    const sel = t.id === selectedTermKind;
+    const statusTag = t.id === 'custom'
+      ? '<span class="term-tag ok">[自定义]</span>'
+      : (t.detected
+          ? '<span class="term-tag ok">[已检测]</span>'
+          : '<span class="term-tag miss">[未检测到]</span>');
+    const capTags = (t.supports_password ? '<span class="term-tag">密码</span>' : '') +
+      (t.supports_key ? '<span class="term-tag">密钥</span>' : '');
+    const pathHtml = t.executable ? '<div class="term-option-path">' + esc(t.executable) + '</div>' : '';
+    return '<button type="button" class="term-option' + (sel ? ' selected' : '') + '" onclick="selectTermOption(\'' + esc(t.id) + '\')">' +
+      '<div class="term-option-top">' +
+        '<span class="term-option-name">' + (sel ? '[●] ' : '[ ] ') + esc(t.name) + '</span>' +
+        '<span class="term-option-tags">' + capTags + statusTag + '</span>' +
+      '</div>' +
+      pathHtml +
+      '<div class="term-option-note">' + esc(t.note) + '</div>' +
+    '</button>';
+  }).join('');
+}
+
+function selectTermOption(kind) {
+  selectedTermKind = kind;
+  renderTerminalOptions();
+  updateTermExtraFields();
+}
+
+function updateTermExtraFields() {
+  const pathRow = document.getElementById('t-path-row');
+  const pathLabel = document.getElementById('t-path-label');
+  const pathInput = document.getElementById('t-custom-path');
+  const argsRow = document.getElementById('t-args-row');
+  const hidePath = (selectedTermKind === 'auto' || selectedTermKind === 'ssh_uri');
+  pathRow.style.display = hidePath ? 'none' : 'flex';
+  if (selectedTermKind === 'custom') {
+    pathLabel.textContent = '可执行文件路径 (必填)';
+    pathInput.placeholder = '如：C:\\Program Files\\...\\ssh-client.exe';
+  } else {
+    pathLabel.textContent = '自定义程序路径 (可选，留空使用自动检测路径)';
+    pathInput.placeholder = '留空使用自动检测路径（适用于绿色版/便携版）';
+  }
+  argsRow.style.display = selectedTermKind === 'custom' ? 'flex' : 'none';
+}
+
+async function saveTerminalSettings() {
+  const customPath = document.getElementById('t-custom-path').value.trim();
+  const customArgs = document.getElementById('t-custom-args').value.trim();
+  if (selectedTermKind === 'custom' && !customPath) {
+    showToast('请填写自定义 SSH 终端可执行文件路径', true);
+    return;
+  }
+  try {
+    const next = await api('/api/settings/ssh-terminal', {
+      method: 'POST',
+      body: JSON.stringify({
+        kind: selectedTermKind,
+        custom_path: (selectedTermKind === 'auto' || selectedTermKind === 'ssh_uri') ? '' : customPath,
+        custom_args: selectedTermKind === 'custom' ? customArgs : ''
+      })
+    });
+    state = next;
+    render();
+    closeModal('modal-terminal');
+    showToast('已保存默认 SSH 终端: ' + termShortLabel(selectedTermKind));
   } catch (e) { showToast(e.message, true); }
 }
 
@@ -2201,9 +2776,25 @@ window.addEventListener('focus', () => {
 
 // Clear any accidental browser autofill before initial render
 document.getElementById('filter-query').value = '';
+document.addEventListener('click', (e) => {
+  const menu = document.getElementById('ssh-term-menu');
+  if (menu && menu.classList.contains('open') && !menu.contains(e.target)) {
+    closeSshTermMenu();
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    closeSshTermMenu();
+    for (const id of ['modal-base', 'modal-machine', 'modal-rule', 'modal-terminal']) {
+      closeModal(id);
+    }
+  }
+});
+window.addEventListener('resize', closeSshTermMenu);
 applyUuRailState();
 applyGuideState();
 refreshState();
+loadSshTerminals(false);
 setInterval(refreshState, 2000);
 </script>
 </body>

@@ -63,9 +63,43 @@ pub struct ForwardRule {
     #[serde(default)]
     pub url_path: String,
     #[serde(default)]
+    pub ssh_username: Option<String>,
+    #[serde(default)]
+    pub ssh_auth_type: Option<AuthType>,
+    #[serde(default)]
+    pub ssh_password: Option<String>,
+    #[serde(default)]
+    pub ssh_key_path: Option<String>,
+    #[serde(default)]
+    pub ssh_key_passphrase: Option<String>,
+    #[serde(default)]
     pub enabled: bool,
     #[serde(default)]
     pub pinned: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SshTerminalConfig {
+    #[serde(default = "default_ssh_terminal_kind")]
+    pub kind: String,
+    #[serde(default)]
+    pub custom_path: String,
+    #[serde(default)]
+    pub custom_args: String,
+}
+
+fn default_ssh_terminal_kind() -> String {
+    "auto".to_string()
+}
+
+impl Default for SshTerminalConfig {
+    fn default() -> Self {
+        Self {
+            kind: default_ssh_terminal_kind(),
+            custom_path: String::new(),
+            custom_args: String::new(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -74,6 +108,8 @@ pub struct AppConfig {
     pub ui_port: u16,
     #[serde(default)]
     pub auto_hide_uu: bool,
+    #[serde(default)]
+    pub ssh_terminal: SshTerminalConfig,
     #[serde(default)]
     pub bases: Vec<TunnelBase>,
     #[serde(default)]
@@ -155,6 +191,7 @@ impl AppConfig {
         Self {
             ui_port: default_ui_port(),
             auto_hide_uu: false,
+            ssh_terminal: SshTerminalConfig::default(),
             bases,
             machines,
             rules,
@@ -227,6 +264,11 @@ fn rule(
         target_host: target_host.to_string(),
         target_port,
         url_path: String::new(),
+        ssh_username: None,
+        ssh_auth_type: None,
+        ssh_password: None,
+        ssh_key_path: None,
+        ssh_key_passphrase: None,
         enabled: false,
         pinned: false,
     }
@@ -318,9 +360,44 @@ mod tests {
         }"#;
         let cfg: AppConfig = serde_json::from_str(legacy_json).unwrap();
         assert!(!cfg.auto_hide_uu);
+        assert_eq!(cfg.ssh_terminal, SshTerminalConfig::default());
         assert!(!cfg.rules[0].pinned);
         assert!(cfg.rules[0].enabled);
         assert!(cfg.rules[0].url_path.is_empty());
+        assert!(cfg.rules[0].ssh_username.is_none());
+        assert!(cfg.rules[0].ssh_auth_type.is_none());
+        assert!(cfg.rules[0].ssh_password.is_none());
+        assert!(cfg.rules[0].ssh_key_path.is_none());
+        assert!(cfg.rules[0].ssh_key_passphrase.is_none());
+    }
+
+    #[test]
+    fn ssh_terminal_and_rule_credentials_roundtrip() {
+        let mut cfg = AppConfig::preset();
+        cfg.ssh_terminal = SshTerminalConfig {
+            kind: "xshell".to_string(),
+            custom_path: r"D:\Portable\Xshell.exe".to_string(),
+            custom_args: "-p {port} {target}".to_string(),
+        };
+        let ssh_rule = cfg.rules.iter_mut().find(|r| r.protocol == "ssh").unwrap();
+        ssh_rule.ssh_username = Some("admin".to_string());
+        ssh_rule.ssh_auth_type = Some(AuthType::PrivateKey);
+        ssh_rule.ssh_password = None;
+        ssh_rule.ssh_key_path = Some("~/.ssh/id_ed25519".to_string());
+        ssh_rule.ssh_key_passphrase = Some("pass123".to_string());
+
+        let json = serde_json::to_string(&cfg).unwrap();
+        let decoded: AppConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(decoded.ssh_terminal, cfg.ssh_terminal);
+        let decoded_rule = decoded.rules.iter().find(|r| r.protocol == "ssh").unwrap();
+        assert_eq!(decoded_rule.ssh_username.as_deref(), Some("admin"));
+        assert_eq!(decoded_rule.ssh_auth_type, Some(AuthType::PrivateKey));
+        assert!(decoded_rule.ssh_password.is_none());
+        assert_eq!(
+            decoded_rule.ssh_key_path.as_deref(),
+            Some("~/.ssh/id_ed25519")
+        );
+        assert_eq!(decoded_rule.ssh_key_passphrase.as_deref(), Some("pass123"));
     }
 
     #[test]

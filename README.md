@@ -62,7 +62,7 @@
 - **每条规则独立掌控**：
   - 独立 `[■ ON ]` / `[  OFF]` 开关、本机一键全开/全关、全局全部开启/关闭
   - `[★]` 置顶规则直达 Windows 系统托盘右键菜单，不用打开网页也能快速切换常用端口
-  - `[测通]` 端到端连通性探测（支持 HTTP `HEAD` 与 SSH Banner 检测）、`[复制]`、`[复制SSH]`、`[>_终端]`（优先调用 Windows Terminal `wt.exe`，回退 `powershell.exe`）
+  - `[测通]` 端到端连通性探测（支持 HTTP `HEAD` 与 SSH Banner 检测）、`[复制]`、`[复制SSH]`、`[>_终端]`（每条 SSH 规则可独立配置用户名、密码或私钥路径/口令，并可从下拉或设置弹窗选择 **Xshell、MobaXterm、PuTTY、KiTTY、SecureCRT、Electerm、Windows Terminal、PowerShell 7 / Windows PowerShell、CMD、Git Bash、系统 `ssh://` 协议或自定义命令模板**）
 - **HTTP / HTTPS 访问路径后缀（`url_path`）**：支持为带安全入口路径的后台（如 `/admin`、`/43235a23` 等）配置后缀，点击 `[打开↗]` 或 `[复制]` 时自动拼接完整 URL；仅修改后缀不重启现有监听连接。
 - **UU 远程窗口防误关收纳**：一键将 `GameViewer.exe` 的端口映射子窗口隐藏到后台（或开启「基座连上自动收纳」），退出 `uuTunnels` 或点击「恢复窗口」时自动还原。
 - **纯黑 CMD / Windows Terminal 字符拼接 TUI**：`#0c0c0c` 纯黑背景、全字符边框与方括号操作控件、零外部前端依赖，直接内嵌编译为单个 `.exe` 可执行文件（约 4.5 MB）。
@@ -82,7 +82,7 @@
 3. 以后无需再在 UU 远程界面维护其他业务端口。
 
 ### 第 3 步：下载并运行 `uuTunnels`（Windows 绿色包）
-1. 前往本仓库的 **Releases** 页面下载最新的 Windows 绿色压缩包（例如 `uuTunnels-v0.2.0-windows-x86_64.zip`），解压到任意目录；
+1. 前往本仓库的 **Releases** 页面下载最新的 Windows 绿色压缩包（例如 `uuTunnels-v0.3.0-windows-x86_64.zip`），解压到任意目录；
 2. 双击运行 **`uuTunnels.exe`**；
 3. 程序会在右下角系统托盘常驻，并自动使用系统默认浏览器打开控制台：`http://127.0.0.1:17890/`；
 4. 在 **「[1] 隧道基座」** 点击 **`[ 编辑凭据 ]`**，核对主机/端口（默认 `127.0.0.1:2201`）、填写你的 Linux SSH 用户名及密码（或私钥路径），点击 **`[ 保存并连接 ]`**；
